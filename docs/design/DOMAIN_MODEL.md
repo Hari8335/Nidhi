@@ -13,13 +13,14 @@ This document defines the core domain concepts, aggregate/consistency boundaries
 
 ---
 
+Session 4 implements entity storage, restricted setters, and mappings. Methods and lifecycle/orchestration descriptions below express the approved future use cases; they are not implemented financial services. PostgreSQL enforcement limits are detailed in the [ERD](ERD.md#persistence-enforcement-boundaries).
+
 ## 2. Core Domain Concepts
 
 ```mermaid
 classDiagram
     class CustomerProfile {
         +Guid CustomerId
-        +string Email
         +string? DisplayName
         +DateTime CreatedAtUtc
         +DateTime? UpdatedAtUtc
@@ -99,7 +100,7 @@ classDiagram
     class IdempotencyRecord {
         +Guid IdempotencyRecordId
         +Guid CustomerId
-        +string Operation
+        +IdempotencyOperation Operation
         +string IdempotencyKey
         +string RequestHash
         +Guid? ResponseTransactionId
@@ -120,12 +121,12 @@ classDiagram
 
     CustomerProfile "1" --> "1" Wallet
     CustomerProfile "1" --> "1" GoldHolding
-    CustomerProfile "1" --> "0..1" SavingsGoal
+    CustomerProfile "1" --> "0..*" SavingsGoal : at most one ACTIVE
     CustomerProfile "1" --> "0..*" FinancialTransaction
     FinancialTransaction "1" --> "2..*" LedgerEntry
     LedgerAccount "1" --> "0..*" LedgerEntry
-    FinancialTransaction "0..1" --> "0..1" GoldPrice
-    IdempotencyRecord "0..1" --> "0..1" FinancialTransaction
+    FinancialTransaction "0..*" --> "0..1" GoldPrice
+    IdempotencyRecord "1" --> "0..1" FinancialTransaction : transaction association
 ```
 
 ---
@@ -138,9 +139,11 @@ classDiagram
 |---|---|---|
 | **Responsibility** | Authentication, password hash, email confirmation flag, lockout/security stamps. | Business identity, display name, customer-facing profile metadata, ownership root for business aggregates. |
 | **Identifier** | `Id` (`Guid`, UUIDv7) | `CustomerId` (`Guid`, matches `IdentityUser.Id` 1:1) |
-| **Attributes** | `UserName`, `NormalizedUserName`, `Email`, `NormalizedEmail`, `EmailConfirmed`, `PasswordHash`, `SecurityStamp`, `ConcurrencyStamp` | `CustomerId`, `Email`, `DisplayName` (optional, max 100 chars), `CreatedAtUtc`, `UpdatedAtUtc` |
-| **Invariants** | Handled by ASP.NET Core Identity (unique email, secure password hashing). | Display name cannot exceed 100 characters; email must match identity email. Email and password cannot be mutated via profile updates (OD-009). |
+| **Attributes** | `UserName`, `NormalizedUserName`, `Email`, `NormalizedEmail`, `EmailConfirmed`, `PasswordHash`, `SecurityStamp`, `ConcurrencyStamp` | `CustomerId`, `DisplayName` (optional, max 100 chars), `CreatedAtUtc`, `UpdatedAtUtc` |
+| **Invariants** | Handled by ASP.NET Core Identity (unique email, secure password hashing). | Display name cannot exceed 100 characters; email is read from Identity and is not duplicated in the profile. Email and password cannot be mutated via profile updates (OD-009). |
 | **Role Assignment** | Role `CUSTOMER` assigned at registration; `ADMIN` provisioned operationally (OD-011). | No role fields stored on domain entity. |
+
+Identity is the source of truth for email and authentication state. Standard Identity persistence also includes `PhoneNumber`, `PhoneNumberConfirmed`, and `TwoFactorEnabled`; their presence does not introduce phone collection or 2FA product workflows in v1.
 
 ### 3.2. Wallet
 
@@ -197,13 +200,13 @@ classDiagram
 
 ### 3.5. Business Transaction (`FinancialTransaction`)
 
-- **Purpose**: Durable, immutable record and receipt of a committed financial operation.
+- **Purpose**: Durable, immutable record and receipt of a committed financial operation. Failed command attempts may be logged or observed separately but never become `FinancialTransaction` history.
 - **Identity**: `TransactionId` (`Guid`, UUIDv7).
 - **Attributes**:
   - `TransactionId` (`Guid`)
   - `CustomerId` (`Guid`)
   - `Type` (`TransactionType`: `WALLET_FUNDING` | `GOLD_PURCHASE`)
-  - `Status` (`TransactionStatus`: `COMPLETED` | `FAILED`)
+  - `Status` (`TransactionStatus`: `COMPLETED` only)
   - `AmountLkr` (`decimal(18,2)`)
   - `GoldQuantityGrams` (`decimal(20,8)?`, null for funding)
   - `PriceVersionId` (`Guid?`, null for funding)
@@ -215,7 +218,7 @@ classDiagram
 - **Invariants**:
   - Once committed with status `COMPLETED`, the transaction is **completely immutable**.
   - `AmountLkr` is strictly positive (`>= 100.00m` and `<= 1,000,000.00m`).
-  - For `GOLD_PURCHASE`, `GoldQuantityGrams`, `PriceVersionId`, `AppliedPricePerGramLkr`, and `PostOperationGoldHoldingGrams` must be non-null and strictly positive.
+  - For `GOLD_PURCHASE`, all four gold-specific fields must be non-null, gold quantity and applied price must be positive, and the post-operation holding must be at least the credited quantity. The ERD CHECK uses explicit NULL guards; `PriceVersionId` is a reference, not a positive numeric value.
   - `PostOperationWalletBalanceLkr` retains the exact balance at commit time and never changes upon historical replay.
 
 ### 3.6. Ledger Account and Ledger Entry
@@ -226,7 +229,7 @@ classDiagram
   - `AccountNumber` (`string`, e.g., `LKR-CUST-{CustomerId}`, `LKR-SYS-FUNDING`)
   - `Name` (`string`)
   - `Unit` (`LedgerUnit`: `LKR` | `GOLD_GRAMS`)
-  - `Classification` (`AccountClassification`: `ASSET`, `LIABILITY`, `EQUITY`)
+  - `Classification` (`AccountClassification`: `ASSET`, `LIABILITY`, `EQUITY`, `CLEARING`)
   - `CustomerId` (`Guid?`, null for system counterpart accounts)
 - **Ledger Entry Attributes**:
   - `EntryId` (`Guid`, UUIDv7)
@@ -234,14 +237,15 @@ classDiagram
   - `AccountId` (`Guid`, FK to `LedgerAccount`)
   - `Unit` (`LedgerUnit`: `LKR` | `GOLD_GRAMS`)
   - `Direction` (`EntryDirection`: `DEBIT` | `CREDIT`)
-  - `Amount` (`decimal(18,2)` for LKR, `decimal(20,8)` for GOLD_GRAMS)
+  - `Amount` (`decimal`, stored in shared `numeric(20,8)`; LKR cent granularity is an application rule)
   - `CreatedAtUtc` (`DateTime`)
 - **Invariants**:
   - Entries within a single transaction must balance strictly per unit:
     - $\sum \text{Debit}_{\text{LKR}} = \sum \text{Credit}_{\text{LKR}}$
     - $\sum \text{Debit}_{\text{GRAMS}} = \sum \text{Credit}_{\text{GRAMS}}$
   - LKR and gold grams are never summed or balanced directly against one another.
-  - Entries are immutable.
+  - Each entry's `(AccountId, Unit)` references the ledger account's `(id, unit)` alternate key, enforcing unit equality in PostgreSQL.
+  - Entries are immutable by application policy; see the [persistence enforcement boundaries](ERD.md#persistence-enforcement-boundaries).
 
 ### 3.7. Savings Goal
 
@@ -269,7 +273,7 @@ classDiagram
 - **Attributes**:
   - `IdempotencyRecordId` (`Guid`)
   - `CustomerId` (`Guid`)
-  - `Operation` (`string`, e.g., `SimulateFunding`, `SaveGold`)
+  - `Operation` (`IdempotencyOperation`: `SimulateFunding`, `SaveGold`; stored as a readable string)
   - `IdempotencyKey` (`string`, max 128 chars)
   - `RequestHash` (`string`, SHA-256 hash of canonicalized request payload)
   - `ResponseTransactionId` (`Guid?`, FK to committed `FinancialTransaction`)
@@ -288,7 +292,7 @@ classDiagram
 - **Identity**: `EventId` (`Guid`, UUIDv7).
 - **Attributes**:
   - `EventId` (`Guid`)
-  - `ActorId` (`Guid`, e.g., Admin ID or System ID)
+  - `ActorId` (`Guid`, stable Admin or System ID; no mandatory Identity-user FK)
   - `ActorRole` (`string`, `ADMIN` | `SYSTEM`)
   - `Action` (`string`, e.g., `PUBLISH_PRICE`, `BOOTSTRAP_ADMIN`)
   - `EntityType` (`string`, e.g., `GoldPrice`, `User`)
@@ -299,12 +303,13 @@ classDiagram
   - Strictly append-only. No edits or deletions.
   - Commits atomically with the administrative action (e.g., price publication).
   - Never stores passwords, tokens, or plaintext secrets.
+  - System events retain their own actor identity; no human Identity user is fabricated. Actor, subject, and correlation identifiers must remain attributable through the recorded context.
 
 ---
 
 ## 4. Aggregate & Consistency Boundaries
 
-A consistency boundary defines the scope of data that must be committed atomically within a single database transaction. In Nidhi v1, consistency is enforced via explicit EF Core database execution strategies (`using var transaction = await dbContext.Database.BeginTransactionAsync(...)`).
+A consistency boundary defines the scope of data that must be committed atomically within a single database transaction. The planned v1 application services must enforce these boundaries using explicit EF Core database transactions (`using var transaction = await dbContext.Database.BeginTransactionAsync(...)`) and appropriate concurrency controls. Session 4 supplies persistence only; it does not independently guarantee posting-set balance or cross-record financial consistency.
 
 ### 4.1. Boundary 1: Customer Simulated Wallet Funding
 

@@ -2,15 +2,15 @@
 
 ## Current foundation and target v1
 
-Nidhi uses a modular monolith with pragmatic clean-architecture boundaries. The existing foundation contains a minimal frontend, a controller-based health endpoint, Development-only OpenAPI, and xUnit unit/integration projects. Authentication, domain entities, persistence, product flows, containers and CI/CD are future work defined by [requirements](requirements/MVP_SCOPE.md), not already configured.
+Nidhi uses a modular monolith with pragmatic clean-architecture boundaries. The existing foundation contains a minimal frontend, a controller-based health endpoint, Development-only OpenAPI, and xUnit unit/integration projects. Session 4 adds domain entities, EF Core 10 / PostgreSQL 18 persistence, Identity storage, reviewed migrations, and local PostgreSQL Compose configuration. Authentication workflows, product flows and CI/CD remain future work defined by [requirements](requirements/MVP_SCOPE.md).
 
 | Concern | Technology / responsibility |
 |---|---|
 | Web | One Next.js app, strict TypeScript, App Router, Tailwind CSS; public, Customer and Administrator experiences |
 | API | C#, .NET 10, ASP.NET Core Web API controllers; REST and OpenAPI |
-| Data (planned) | PostgreSQL through Entity Framework Core and reviewed migrations |
+| Data | PostgreSQL 18 through Entity Framework Core 10 and reviewed migrations |
 | Tests | xUnit backend tests; frontend tests and selected Playwright flows later |
-| Delivery (planned) | Docker/Compose, GitHub Actions CI/CD, deployment and operational checks |
+| Delivery | Local PostgreSQL Docker Compose; GitHub Actions CI/CD, deployment and operational checks remain planned |
 
 ## Repository boundaries
 
@@ -39,11 +39,11 @@ No apps/*, shared TypeScript backend packages or native mobile application are p
 
 Infrastructure is wired at the API composition boundary; this reference is not permission to put business operations in controllers. Introduce interfaces only when a use case needs a boundary. No generic repository or custom Unit of Work wrapper is implied; select transaction handling during domain/data design.
 
-Next.js renders experiences and calls the API. It must not implement a competing business backend using API routes, own persistence, or decide financial outcomes. Frontend visibility and route guards improve usability but never replace ASP.NET Core authentication, role and ownership checks. Web v1 uses ASP.NET Core Identity with Secure HttpOnly cookie authentication and no remember-me (OD-018). Browser JWT/localStorage authentication and token/mobile authentication are excluded. Verification and one-time password-reset emails are identity infrastructure; require CSRF/cookie/origin defenses and login/registration abuse controls in later security design. No authentication package is installed in this documentation session.
+Next.js renders experiences and calls the API. It must not implement a competing business backend using API routes, own persistence, or decide financial outcomes. Frontend visibility and route guards improve usability but never replace ASP.NET Core authentication, role and ownership checks. Web v1 uses ASP.NET Core Identity with Secure HttpOnly cookie authentication and no remember-me (OD-018). Browser JWT/localStorage authentication and token/mobile authentication are excluded. Verification and one-time password-reset emails are identity infrastructure; require CSRF/cookie/origin defenses and login/registration abuse controls in later security design. Identity persistence is installed, including its standard phone-number and two-factor columns. Nidhi v1 exposes no phone or 2FA workflow; cookie authentication and token flows are not yet implemented. Identity owns email; CustomerProfile does not duplicate it.
 
 ## Business and financial boundaries
 
-Application use cases orchestrate [simulated funding](requirements/SIMULATED_WALLET_FLOW.md) and [gold-saving](requirements/GOLD_SAVING_FLOW.md). Domain rules validate approved amounts, eligibility, precision and conservation; Infrastructure later supplies durable atomic persistence. Request idempotency, concurrency and receipt replay must survive restarts. Historical transactions, ledger entries and price versions are not silently edited.
+Application use cases orchestrate [simulated funding](requirements/SIMULATED_WALLET_FLOW.md) and [gold-saving](requirements/GOLD_SAVING_FLOW.md). Domain rules validate approved amounts, eligibility, precision and conservation; Infrastructure supplies EF Core persistence and PostgreSQL transactions; future application orchestration must use them to enforce financial atomicity. Request idempotency, concurrency and receipt replay must survive restarts. Historical transactions, ledger entries and price versions are not silently edited.
 
 Two roles only: CUSTOMER and ADMIN. Public registration cannot provision ADMIN. Administrative reads cover Customer records, transactions, ledger, prices and audits. Price publication is the only v1 administrative business mutation and must commit its audit evidence atomically. No suspension, manual correction, balance-edit or role-management UI is implied. ADMIN is provisioned through controlled operational bootstrap with protected configuration/secrets, no hard-coded/shared credential and practical audit evidence. Registered email-verified Customers may use customer features; no suspension/status workflow is modeled. Retention remains a launch decision, not a conceptual-design blocker. See the [decision log](requirements/OPEN_DECISIONS.md).
 

@@ -31,7 +31,7 @@ We evaluated two standard double-entry representations:
 Every ledger entry specifies:
 - `unit`: `LKR` or `GOLD_GRAMS`.
 - `direction`: `DEBIT` or `CREDIT`.
-- `amount`: strictly positive decimal (`decimal(18,2)` for LKR, `decimal(20,8)` for gold grams).
+- `amount`: strictly positive decimal stored in a shared `numeric(20,8)` column. Application validation must limit LKR postings to cents; gold grams use eight decimal places.
 
 ---
 
@@ -127,4 +127,6 @@ The projection in `gold_holdings.quantity_grams` must equal the net credit balan
 $$\text{GoldHolding.QuantityGrams} = \sum \text{Credit}_{2501} - \sum \text{Debit}_{2501}$$
 
 ### Invariant 3: Zero Mixing of Units
-No single query or aggregate may compute sums across different `unit` types. The `ledger_entries` table enforces that an entry's unit must match its parent `ledger_accounts.unit`.
+No single query or aggregate may compute sums across different `unit` types. The composite FK `ledger_entries(account_id, unit)` references the supporting alternate key `AK_ledger_accounts_id_unit` on `ledger_accounts(id, unit)`. PostgreSQL therefore guarantees that an entry's unit matches its account's unit.
+
+Whole-posting-set balance and wallet/holding reconciliation are application transaction responsibilities, supported by use-case and reconciliation tests. These are not guaranteed by row checks alone. Append-only behavior is enforced through controlled application writes and restricted domain setters; privileged/manual SQL can still mutate history. Session 4 implements storage and structural validation, not posting services. See the [persistence enforcement boundaries](ERD.md#persistence-enforcement-boundaries).

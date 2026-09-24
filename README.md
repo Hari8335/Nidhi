@@ -9,9 +9,10 @@ Financial activity is initially simulated. This foundation accepts no real money
 - Frontend: Next.js, React, strict TypeScript, App Router, Tailwind CSS, ESLint.
 - Backend: C#, .NET 10, ASP.NET Core controllers, REST and OpenAPI; a modular monolith.
 - Tests: xUnit unit tests and ASP.NET Core integration tests.
-- Planned: PostgreSQL with Entity Framework Core; Docker / Docker Compose; frontend tests, selected Playwright flows, and GitHub Actions later.
+- Persistence: PostgreSQL 18 in Docker Compose, EF Core 10, Npgsql 10, and ASP.NET Core Identity storage.
+- Planned: frontend tests, selected Playwright flows, and GitHub Actions.
 
-Database configuration, EF Core, authentication, product functionality, containers, and CI/CD are intentionally not part of this foundation.
+Persistence storage is implemented. Authentication flows, product use cases, and CI/CD remain future work.
 
 ## Structure
 
@@ -22,8 +23,8 @@ backend/
   src/
     Nidhi.Api/               HTTP controllers and composition
     Nidhi.Application/       Future application logic
-    Nidhi.Domain/            Future domain logic; no project dependencies
-    Nidhi.Infrastructure/    Future external services and persistence
+    Nidhi.Domain/            Domain entities; no project dependencies
+    Nidhi.Infrastructure/    Identity and EF Core persistence
   tests/
     Nidhi.UnitTests/
     Nidhi.IntegrationTests/
@@ -31,7 +32,7 @@ docs/                        Product, architecture and requirements documents
 AGENTS.md                    Current engineering rules
 ```
 
-References: Application → Domain; Infrastructure → Application → Domain; Api → Application and Infrastructure. The inner projects are deliberately empty until requirements justify code. Business logic and authorization belong in ASP.NET Core, not Next.js routes or controllers.
+References: Application → Domain; Infrastructure → Application → Domain; Api → Application and Infrastructure. Application use cases remain unimplemented. Business logic and authorization belong in ASP.NET Core, not Next.js routes or controllers.
 
 ## Prerequisites
 
@@ -57,7 +58,7 @@ The development launch profile serves http://localhost:5050:
 - `GET /health` returns `{"status":"ok"}` (process liveness only).
 - `GET /openapi/v1.json` exposes the API description in Development only.
 
-No secrets or database are needed. `.env.example` documents optional API process environment settings. ASP.NET Core does not automatically load `.env` files; the launch profile supplies local defaults. There is no frontend/API data integration yet.
+Health and OpenAPI require no database. For persistence, follow the [local database setup](docs/DEVELOPMENT_DATABASE.md). ASP.NET Core does not automatically load `.env`. There is no frontend/API data integration yet.
 
 ## Validate
 
@@ -73,7 +74,7 @@ pnpm typecheck
 pnpm build
 ```
 
-Integration tests use an in-memory ASP.NET Core test server without PostgreSQL. They verify health routing and OpenAPI exposure by environment.
+HTTP integration tests use an ASP.NET Core test server without PostgreSQL. Model tests inspect Npgsql metadata. The separately configured PostgreSQL integration test uses a disposable real database; see [database validation](docs/DEVELOPMENT_DATABASE.md).
 
 ## Product requirements
 

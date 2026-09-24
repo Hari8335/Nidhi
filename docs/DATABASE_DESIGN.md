@@ -1,6 +1,6 @@
 # Conceptual data design — Nidhi v1
 
-This is a requirements-led conceptual inventory, **not a finalized schema or ER diagram**. PostgreSQL with Entity Framework Core is planned behind C#/ASP.NET Core. No entities, migrations, indexes or database configuration are implemented here. Product-approved numeric precision is recorded below; other physical schema details remain Session 3 work. Only launch/deployment OD-013–015 remain open in the [decision log](requirements/OPEN_DECISIONS.md); they do not block conceptual domain/API design.
+This requirements-led overview summarizes the approved [relational model](design/ERD.md). Session 4 implemented and validated PostgreSQL 18 / EF Core 10 persistence, Identity storage, constraints, and the initial migration. Financial application use cases remain future work. Only launch/deployment OD-013–015 remain open in the [decision log](requirements/OPEN_DECISIONS.md).
 
 ## Financial constraints
 
@@ -16,28 +16,35 @@ Round calculated gold DOWN to 8 decimal places and reject a zero result. Preserv
 
 All financial records affecting one operation must commit atomically. Stable transaction identifiers, durable idempotency and concurrency-safe nonnegative wallet balances are required. Preserve immutable transaction/ledger history and price versions. Any future correction must use linked compensating entries, but v1 has no reversal capability.
 
-Retain the simplified double-entry intent. Balance each accounting unit independently: LKR debits/credits cannot be added to gram debits/credits. OD-016 approves separate balanced unit books linked by business transaction. The conceptual chart below is sufficient for v1; detailed entities, debit/credit conventions and posting mechanics remain Session 3 work.
+Retain the simplified double-entry intent. Balance each accounting unit independently: LKR debits/credits cannot be added to gram debits/credits. OD-016 approves separate balanced unit books linked by business transaction. The conceptual chart below is sufficient for v1; the detailed entities and posting conventions are specified in the Session 3 design documents; posting services are not yet implemented.
 
 ## Justified concepts and relationships
 
 | Concept | Purpose / conceptual relationships | Requirement source / unresolved detail |
 |---|---|---|
-| User | ASP.NET Core Identity with CUSTOMER/ADMIN; required email/password hash, optional display name and verification information; no phone or speculative status/suspension states | FR-AUTH-001/004/005/006/007; approved identity and controlled provisioning OD-001/002/010/011/018 |
+| User | ASP.NET Core Identity with CUSTOMER/ADMIN; Identity-owned email/password hash and verification information; no phone collection or 2FA workflow and no speculative status/suspension states | FR-AUTH-001/004/005/006/007; approved identity and controlled provisioning OD-001/002/010/011/018 |
+| CustomerProfile | Display name and timestamps linked 1:1 to the Identity user; no duplicated email or authentication fields | FR-PROFILE-001; Identity is the source of truth for email |
 | Wallet | A Customer's simulated LKR balance, initially zero; related funding/saving transactions | FR-WALLET-001/002; approved caps/precision OD-003/005; successful daily count must survive concurrency |
 | GoldHolding | A Customer's simulated gold grams, initially zero; affected by completed gold-saving transactions | FR-GOLD-002, FR-HOLDING-001; approved precision and separate-unit reconciliation OD-005/016 |
 | GoldPrice | Retained simulated LKR/gram price versions; transactions reference the version actually used | FR-GOLD-001/003, FR-ADMIN-005/006; immediate activation, required priceVersionId, 24-hour freshness and first production publication OD-006/017 |
-| Transaction | Stable Customer-linked receipt for simulated funding or gold-saving; contains committed inputs/results/status/time, including original post-operation balances | FR-TRANSACTION-001/002; failure record lifecycle and exact persisted fields await domain design |
-| LedgerAccount | Conceptual classification of entries per unit and owner/system counterparty, sufficient for double-entry reconciliation | NFR-DATA-005; not a committed table design, OD-016 |
+| Transaction | Stable Customer-linked receipt for simulated funding or gold-saving; contains committed inputs/results/status/time, including original post-operation balances | FR-TRANSACTION-001/002; COMPLETED records only; failed command attempts may be logged/observed separately, never stored as financial transactions |
+| LedgerAccount | Conceptual classification of entries per unit and owner/system counterparty, sufficient for double-entry reconciliation | NFR-DATA-005; implemented ledger_accounts mapping, OD-016 |
 | LedgerEntry | Immutable transaction-linked debit/credit evidence with unit and account relationship | FR-ADMIN-004; accounting semantics OD-016 |
-| Idempotency association | Associates Customer, operation and request content with durable outcome; must protect retries across restarts | FR-WALLET-003, FR-GOLD-004; successful association permanent; same-content replay, changed-content conflict and safe pre-commit retry OD-012; physical representation deferred |
+| Idempotency association | Associates Customer, operation and request content with durable outcome; must protect retries across restarts | FR-WALLET-003, FR-GOLD-004; successful association permanent; same-content replay, changed-content conflict and safe pre-commit retry OD-012; implemented idempotency_records storage, command orchestration deferred |
 | SavingsGoal | Customer-owned positive target and progress policy; no financial mutation merely from creation | FR-GOAL-001/002; total-gram target; one active goal; optional date; current total holding / target; no reservation OD-007/008 |
-| AuditLog | Stable actor/action/subject/time/reason/before-after evidence, including price-version association | FR-AUDIT-001/002; privacy, retention and access OD-013 |
+| AuditEvent | Stable admin or system actor/action/subject/time/reason/before-after evidence, including price-version correlation; no mandatory Identity-user FK | FR-AUDIT-001/002; privacy, retention and access OD-013 |
 
-This inventory does not decide identifiers' physical types, relationship cardinalities at storage level, computed versus stored projections, constraints/indexes, transaction isolation or migration strategy. One conceptual wallet/holding per Customer is the v1 product view; implementation must derive an explicit model from approved rules.
+The [ERD](design/ERD.md) specifies the implemented identifiers, columns, relationships, constraints, and indexes. Identity retains standard built-in `phone_number`, `phone_number_confirmed`, and `two_factor_enabled` columns; these do not authorize phone collection or expose phone/2FA functionality in Nidhi v1. Profile email is obtained from Identity, whose normalized-email index is unique.
+
+The ledger account alternate key `AK_ledger_accounts_id_unit` on `(id, unit)` supports the composite FK from `ledger_entries(account_id, unit)`. This database constraint guarantees that an entry's unit matches its account. Gold-purchase CHECK constraints use explicit `IS NOT NULL` guards because PostgreSQL rejects only `FALSE`, while `UNKNOWN` passes. These guards implement the existing required-field rule.
+
+Audit actors may be system-generated and need not correspond to a human Identity user. Required stable actor IDs, roles, subjects, timestamps, and recorded context preserve attribution. `gold_prices.audit_log_id` is a correlation identifier, not a mandatory FK; controlled application transactions must preserve the audit association.
+
+PostgreSQL does not independently guarantee append-only behavior against privileged/manual SQL, whole-posting-set balance, LKR cent granularity in the shared `numeric(20,8)` ledger amount column, or cross-record financial business rules. Controlled application writes, transaction orchestration, and appropriate use-case/reconciliation tests must enforce these rules. Session 4 validates structural persistence, not those future use cases; see [enforcement boundaries](design/ERD.md#persistence-enforcement-boundaries).
 
 ## Deferred concepts
 
-KycProfile/document verification, RecurringPlan, payment records, custody/redemption and general product/marketing notification models are outside v1. They are future concepts, not empty tables to scaffold. Identity verification and one-time email reset support are in scope through ASP.NET Core Identity; their concrete model follows OD-002/018 during identity design.
+KycProfile/document verification, RecurringPlan, payment records, custody/redemption and general product/marketing notification models are outside v1. They are future concepts, not empty tables to scaffold. Identity verification and one-time email reset support are in scope through ASP.NET Core Identity; Identity persistence exists, while the OD-002/018 authentication and token workflows remain future work.
 
 ## Detailed Design Specifications
 
@@ -50,7 +57,7 @@ Session 3 establishes the concrete specifications elaborated from this conceptua
 
 ## Conceptual chart of accounts — v1 only
 
-These are logical roles, not entity classes, table names or finalized debit/credit conventions.
+These logical account roles are expanded into posting conventions in the [ledger model](design/LEDGER_MODEL.md). No fixed accounts are seeded by the initial migration.
 
 | Book / logical account | Purpose |
 |---|---|
@@ -60,4 +67,4 @@ These are logical roles, not entity classes, table names or finalized debit/cred
 | Gold grams — Customer simulated holding | Customer gram balance projection reconciles to this account |
 | Gold grams — System simulated gold issuance counterpart | Counterpart to credited grams; no real inventory or custody implied |
 
-Funding pairs equal LKR entries between the funding source and Customer wallet; gold is unchanged. Gold-saving pairs the full LKR amount between Customer wallet and LKR conversion counterpart, and separately pairs credited grams between Customer holding and gram issuance counterpart. The same business transaction links both balanced books. Exact price/version and conversion residual explain the relationship between the units; they never numerically balance one unit against another. Residual evidence does not introduce fees or an extra wallet credit. Detailed posting/entity design belongs to Session 3.
+Funding pairs equal LKR entries between the funding source and Customer wallet; gold is unchanged. Gold-saving pairs the full LKR amount between Customer wallet and LKR conversion counterpart, and separately pairs credited grams between Customer holding and gram issuance counterpart. The same business transaction links both balanced books. Exact price/version and conversion residual explain the relationship between the units; they never numerically balance one unit against another. Residual evidence does not introduce fees or an extra wallet credit. Detailed posting/entity design is recorded in Session 3; application posting services remain future work.
