@@ -23,7 +23,7 @@ We evaluated three potential database and domain representations:
 | **Option C: Table-Per-Type (TPT) with Base Table** | Base table `transactions` + extension tables `wallet_fundings` and `gold_purchases` sharing PK. | Fully normalized; no nullable fields in base table. | Requires JOINs for every query; EF Core TPT adds unnecessary mapping overhead and query complexity. | Rejected as overengineering for v1. |
 
 ### Decision: Option A (Single Unified Table with Type Check Constraints)
-We select **Option A**. The table contains a `CHECK` constraint ensuring that if `type = 'GOLD_PURCHASE'`, the fields `gold_quantity_grams`, `price_version_id`, `applied_price_per_gram_lkr`, and `post_gold_holding_grams` must be strictly non-null and positive. Conversely, if `type = 'WALLET_FUNDING'`, those fields must be `NULL`.
+We select **Option A**. The table contains a `CHECK` constraint ensuring that if `type = 'GOLD_PURCHASE'`, all four gold-specific fields must be non-null, quantity and applied price must be positive, and the post-holding snapshot must be at least the credited quantity. `price_version_id` is a foreign-key reference. Conversely, if `type = 'WALLET_FUNDING'`, those fields must be `NULL`. PostgreSQL CHECK accepts `UNKNOWN` as well as `TRUE`, rejecting only `FALSE`; the [ERD expression](ERD.md) therefore includes explicit `IS NOT NULL` guards. This enforces the existing product rule rather than changing it.
 
 ---
 
@@ -65,7 +65,7 @@ A critical requirement is that failed commands must not create fabricated or dan
 | **Business Conflict** (e.g., `PRICE_CHANGED`, `INSUFFICIENT_SIMULATED_FUNDS`) | **No** | **No** | **No** (Key not consumed; safe to retry) | Yes (`Warning` level) |
 | **Database Failure / Rollback** | **No** (Transaction rolled back) | **No** (Rolled back) | **No** (Rolled back) | Yes (`Error` level) |
 
-*Key Principle*: In v1, the `financial_transactions` table only contains **committed, valid financial transactions**. Rejections and validation failures do not leave rows in `financial_transactions`. This prevents cluttering customer history with failed attempts and guarantees that every transaction in the table corresponds directly to balanced ledger entries.
+*Key Principle*: In v1, the `financial_transactions` table only contains **committed, valid financial transactions**. Rejections and validation failures do not leave rows in `financial_transactions`. Failed command attempts may be logged/observed separately and are not financial transactions. Controlled application transaction orchestration must ensure each committed record has its complete balanced ledger posting set. PostgreSQL row constraints and foreign keys alone do not guarantee that set or its balance; those use cases and tests follow Session 4.
 
 ---
 
