@@ -6,7 +6,7 @@ This document defines the error handling protocol, HTTP status code semantics, R
 
 ## 1. Error Response Envelope: RFC 7807 / RFC 9457 Problem Details
 
-All error responses from the Nidhi ASP.NET Core API return `Content-Type: application/problem+json`. 
+All error responses from the Nidhi ASP.NET Core API return `Content-Type: application/problem+json`.
 
 ```json
 {

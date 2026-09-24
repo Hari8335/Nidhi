@@ -16,7 +16,7 @@ We evaluate two concurrency strategies for financial mutation operations:
 | **Pessimistic Row Locking (`SELECT ... FOR UPDATE`)** | Acquire an exclusive row lock on the customer's `wallets` row at transaction start. | Guarantees deterministic serialization of all financial actions per customer; zero retry loops needed; prevents race conditions on balance caps and daily limits. | Slightly longer lock duration during transaction processing. Because locks are strictly scoped to a single customer, there is **zero cross-customer contention**. | **SELECTED for Financial Operations** |
 
 ### Decision: Pessimistic Row Locking for Financial Mutations (ODQ-002)
-Critical financial operations (`WALLET_FUNDING` and `GOLD_PURCHASE`) begin by locking the customer's `wallets` record using PostgreSQL row-level locking (`SELECT ... FOR UPDATE` via EF Core or raw SQL). Because each customer only locks their own wallet, throughput scales linearly with the number of customers without global database bottlenecks. 
+Critical financial operations (`WALLET_FUNDING` and `GOLD_PURCHASE`) begin by locking the customer's `wallets` record using PostgreSQL row-level locking (`SELECT ... FOR UPDATE` via EF Core or raw SQL). Because each customer only locks their own wallet, throughput scales linearly with the number of customers without global database bottlenecks.
 
 Under ODQ-002, PostgreSQL's `xmin` system column is mapped as an optimistic concurrency token on mutable entities, but `xmin` does **not** replace financial transaction concurrency controls: critical mutations strictly rely on PostgreSQL database transactions, wallet row locking (`FOR UPDATE`), database check constraints, and scoped idempotency records.
 
@@ -80,11 +80,11 @@ A customer with LKR 4,900,000.00 sends two concurrent funding requests for LKR 2
 2. Verify: `CurrentBalance + RequestAmount <= 5,000,000.00`.
 3. Count successful funding operations within the current **UTC calendar day**:
    ```sql
-   SELECT COUNT(*) 
-   FROM financial_transactions 
-   WHERE customer_id = @CustomerId 
-     AND type = 'WALLET_FUNDING' 
-     AND status = 'COMPLETED' 
+   SELECT COUNT(*)
+   FROM financial_transactions
+   WHERE customer_id = @CustomerId
+     AND type = 'WALLET_FUNDING'
+     AND status = 'COMPLETED'
      AND created_at_utc >= @StartOfUtcDay;
    ```
 4. If `Count >= 20`, reject with `422 Unprocessable Entity` (`DAILY_FUNDING_LIMIT_EXCEEDED`).
@@ -112,7 +112,7 @@ sequenceDiagram
 
     Customer->>API: POST /api/v1/gold-purchases (priceVersionId: 15)
     Admin->>API: POST /api/v1/admin/prices (publishes Version 16)
-    
+
     API->>DB: INSERT INTO gold_prices (Version 16, published_at_utc: Now)
     Note over DB: Version 16 is now the latest active price!
 
