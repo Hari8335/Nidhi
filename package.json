@@ -3,14 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev:web": "pnpm -F web dev",
-    "dev:api": "pnpm -F api start:dev",
-    "dev:mobile": "pnpm -F mobile start",
-    "lint": "pnpm -r run lint",
-    "typecheck": "pnpm -r run typecheck"
+    "dev:web": "pnpm --filter web dev",
+    "dev:api": "dotnet run --project backend/src/Nidhi.Api",
+    "lint": "pnpm --filter web lint",
+    "build": "pnpm --filter web build",
+    "typecheck": "pnpm --filter web typecheck"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.0.0"
   },
   "packageManager": "pnpm@9.0.0"
 }
