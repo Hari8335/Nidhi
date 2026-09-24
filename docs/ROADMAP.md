@@ -1,25 +1,35 @@
-# Nidhi: 14-Day MVP Implementation Roadmap
+# Nidhi product-development roadmap
 
-## Phase 1: Foundation (Days 1-3)
-- **Day 1**: Initialize pnpm workspace, configure ESLint/Prettier, set up `packages/config` and `packages/shared`.
-- **Day 2**: Setup local Docker infrastructure (PostgreSQL). Initialize Prisma in `packages/db`, define the core schema, and generate migrations.
-- **Day 3**: Scaffold `apps/api` with NestJS. Setup global exception filters, validation pipes, and OpenAPI (Swagger). Connect to Prisma.
+The technical foundation is complete. The current session defines product requirements only. The original two-week plan is a development milestone, not a promise to complete public-launch, operational, regulatory or future real-financial-service requirements in fourteen days. Estimates follow approved scope and capacity; no dates are implied below.
 
-## Phase 2: Core Domain & Auth (Days 4-6)
-- **Day 4**: Implement Auth Module (JWT) and Users Module.
-- **Day 5**: Implement KYC Simulation Module and Audit Logs Module.
-- **Day 6**: Scaffold `apps/mobile` with Expo Router and `apps/web` with Next.js App Router. Implement basic login screens.
+| Step | Milestone | Exit evidence |
+|---|---|---|
+| 1 | Product requirements | Scope, actors, FR/NFR IDs, stories, flows and decisions reviewed; design-blocking decisions approved |
+| 2 | Domain model | Invariants, amount/rounding rules, eligibility, accounting and price/goal semantics agreed |
+| 3 | ER diagram | Relationships, constraints, numeric precision, immutable history and idempotency persistence reviewed |
+| 4 | API contract | REST/OpenAPI shapes, exact decimal transport, auth/ownership, pagination, errors and retries specified |
+| 5 | PostgreSQL + EF Core foundation | Local database/migrations reproducible; rollback and persistence test approach documented |
+| 6 | Authentication/authorization | ASP.NET Core Identity cookie login/logout, verification and one-time reset emails, controlled ADMIN provisioning, two roles and ownership tested |
+| 7 | First authenticated vertical slice | Registered email-verified Customer can login and retrieve only their own basic profile through web/API/database |
+| 8 | Simulated wallet | Zero initial balance, funding receipts/ledger, caps, safe retries, concurrency and failure tests |
+| 9 | Simulated gold pricing | Audited price versions, initial publication and effective/unavailable price policy tested |
+| 10 | Gold-saving transaction | End-to-end atomic debit/credit/ledger/receipt; rounding, concurrency, retries and faults tested |
+| 11 | Holdings and transactions | Dashboard, indicative valuation, history/details and empty/error states reconciled |
+| 12 | Savings goals | Approved units/progress/count semantics implemented with acceptance tests |
+| 13 | Admin operations | Dashboard, Customer search/details, transaction/ledger inspection, price management and audit review; no extra mutations |
+| 14 | Public landing experience | Public content, disclosures, Terms, Privacy, Contact and auth entry points reviewed |
+| 15 | Testing and security hardening | FR/story coverage, NFR evidence, accessibility/responsiveness, abuse controls and financial reconciliation reviewed |
+| 16 | Docker / Compose | Reproducible local/deployment images and configuration instructions exercised |
+| 17 | CI/CD | Required build/lint/type/test gates and controlled deployment steps pass |
+| 18 | Deployment | Environment configuration, operator visibility, backup/restore and rollback drill completed |
+| 19 | Launch-readiness review | All launch-blocking decisions closed, content/data policy approved, simulation labels verified, evidence accepted by product owner |
 
-## Phase 3: Financial Engine (Days 7-9)
-- **Day 7**: Implement Gold Pricing Module (simulated price fetching/generation).
-- **Day 8**: Implement Wallet and Gold Holdings logic.
-- **Day 9**: Implement the Transactions & Ledger modules. Ensure idempotency middleware is functioning.
+Testing and security checks happen throughout; step 15 consolidates evidence rather than deferring all testing. Step 9 may establish backend/admin price publication needed by step 10; step 13 completes the full Administrator experience. Public disclosures can be drafted early, with final experience completed at step 14.
 
-## Phase 4: Savings Features & Mobile UI (Days 10-12)
-- **Day 10**: Implement Savings Goals API.
-- **Day 11**: Implement Recurring Savings API (Cron jobs).
-- **Day 12**: Build out Mobile UI for Wallet, Gold Conversion, and Goals. Connect Mobile app to the API.
+An initial two-week checkpoint should demonstrate progress through agreed requirements/design and a feasible vertical slice, then reassess remaining scope. Incomplete gates delay public release rather than silently reducing integrity/security requirements.
 
-## Phase 5: Polish & Admin (Days 13-14)
-- **Day 13**: Build Next.js Admin Dashboard to view system metrics, user balances, and audit logs.
-- **Day 14**: End-to-end testing, error handling review, documentation updates, and final portfolio presentation prep.
+## Post-MVP possibilities
+
+Reassess native mobile, recurring simulation, general product/marketing notifications, advanced analytics and richer administration against demonstrated user needs. Real payments, bank integration, custody/redemption, KYC and live prices require a separately approved scope and operational assessment; they are not automatic next steps. See [MVP scope](requirements/MVP_SCOPE.md).
+
+OD-001–012 and OD-016–018 are approved inputs for later design. OD-013–015 remain launch/deployment gates, not blockers to conceptual domain/API design. Session 3 must elaborate approved policies without inventing account suspension states or unsupported legal eligibility restrictions. Authentication emails are required v1 identity infrastructure, not deferred general notifications.

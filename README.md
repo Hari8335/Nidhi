@@ -27,7 +27,7 @@ backend/
   tests/
     Nidhi.UnitTests/
     Nidhi.IntegrationTests/
-docs/                        Preserved product planning documents
+docs/                        Product, architecture and requirements documents
 AGENTS.md                    Current engineering rules
 ```
 
@@ -75,6 +75,10 @@ pnpm build
 
 Integration tests use an in-memory ASP.NET Core test server without PostgreSQL. They verify health routing and OpenAPI exposure by environment.
 
-## Historical documentation
+## Product requirements
 
-The original PROJECT_SPEC, ARCHITECTURE, DATABASE_DESIGN, and ROADMAP documents are preserved unchanged. Their NestJS, Prisma, React Native, directory layout, and integer-money guidance describe the earlier plan and are not current implementation instructions. Follow this README and AGENTS.md for the current stack and decimal precision rules. See [foundation migration notes](docs/FOUNDATION_MIGRATION.md) for the inspection findings and client-source preservation status.
+The technical foundation is implemented; the v1 product capabilities are planned. Start with the [product definition](docs/PROJECT_SPEC.md), [MVP scope](docs/requirements/MVP_SCOPE.md), [functional requirements](docs/requirements/FUNCTIONAL_REQUIREMENTS.md), [non-functional requirements](docs/requirements/NON_FUNCTIONAL_REQUIREMENTS.md), and [user stories](docs/requirements/USER_STORIES.md).
+
+The [gold-saving flow](docs/requirements/GOLD_SAVING_FLOW.md) and [simulated wallet flow](docs/requirements/SIMULATED_WALLET_FLOW.md) define the financial simulation. The [decision log](docs/requirements/OPEN_DECISIONS.md) records approved product rules. Only OD-013–015 remain open for launch/deployment policy; they do not block conceptual domain/API design.
+
+See [architecture](docs/ARCHITECTURE.md), [conceptual data design](docs/DATABASE_DESIGN.md), and [roadmap](docs/ROADMAP.md) for the design sequence. The [documentation audit](docs/requirements/DOCUMENTATION_AUDIT.md) explains which earlier assumptions were superseded. [Foundation migration notes](docs/FOUNDATION_MIGRATION.md) preserve the historical inspection/validation results and client-source preservation limitation. AGENTS.md remains the engineering authority.

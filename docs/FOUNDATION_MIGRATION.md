@@ -1,5 +1,7 @@
 # Foundation migration
 
+Historical record of Foundation Milestone 1. Validation and preservation statements below refer to that milestone. Session 2 revises the product documents; consult the [current product definition](PROJECT_SPEC.md) and [documentation audit](requirements/DOCUMENTATION_AUDIT.md) for current requirements.
+
 ## Original state
 
 The pnpm workspace contained a NestJS API returning only `Hello World!`, its starter tests, two placeholder shared TypeScript packages, an Expo starter, and a custom Next.js landing-page prototype with a calculator. No backend Nidhi business logic, database, authentication, or financial persistence existed.
@@ -10,7 +12,7 @@ Documentation described Prisma, Expo Router, packages/db, packages/shared, packa
 
 ## Preservation and removal
 
-All four original product planning documents remain unchanged. Their old stack, roadmap, and money representation require a separate future revision. README.md and AGENTS.md take precedence.
+At the foundation milestone, all four original product planning documents were preserved unchanged. Session 2 subsequently revises their stack, roadmap and money representation, retaining useful reasoning and recording changes in the documentation audit. AGENTS.md governs engineering discipline.
 
 A source archive was created during restructuring, but `docs/archive/original-clients.tar.gz` was already absent from the workspace at the final review. The old client commit objects (`bb1a34597840d1f25eae5f6dac5ba56136e20a63` for web and `1f059b50fcde502de31ccdcf60c1884d3308fb65` for mobile) are not present in the local repository. The historical Git links alone do not preserve the client source here; recovery requires an external backup or the original client repositories.
 
@@ -38,7 +40,7 @@ pnpm 9 emits a Node.js url.parse deprecation warning on Node 24; installation al
 - Frontend pnpm install: passed; lockfile updated for frontend/web only.
 - Frontend pnpm lint, pnpm typecheck, and pnpm build: passed, including the final pre-commit rerun.
 - Frontend development server: ready at localhost:3000; GET / returned HTTP 200 with the expected title, heading, and foundation content. Stopped with Ctrl+C after verification. Visual browser verification was unavailable because Computer Use permission was not granted.
-- Git diff whitespace check: passed. Original product documents are byte-for-byte unchanged.
+- Git diff whitespace check: passed. Original product documents were byte-for-byte unchanged at the foundation milestone.
 
 The restricted shell required network permission for dependency downloads and socket permission for the .NET test runner. Backend validation used `-m:1` (single MSBuild worker), and build/test used `-p:UseSharedCompilation=false` to avoid compiler-server IPC restrictions. These flags do not disable compilation, analyzers, or tests. A sandbox-only CSSM_ModuleLoad diagnostic did not recur in the successful elevated test run.
 
