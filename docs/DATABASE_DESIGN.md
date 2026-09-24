@@ -12,7 +12,7 @@ Use C# decimal, never float/double, with exact API serialization. Approved preci
 | Simulated LKR price per gram | decimal(18,4) |
 | Gold quantity, including goal targets | decimal(20,8) |
 
-Round calculated gold DOWN to 8 decimal places and reject a zero result. Preserve exact LKR amount, immutable price/version and credited grams to calculate/store `residual LKR = amount − (credited grams × price)` for reconciliation/audit. Residuals can be sub-cent, so do not round them away into a decimal(18,2) field; residual representation/storage is a detailed design task. The old integer-cents proposal and gold (18,8) candidate are superseded.
+Round calculated gold DOWN to 8 decimal places and reject a zero result. Preserve exact LKR amount, immutable price/version and credited grams to calculate `residual LKR = amount − (credited grams × price)` for reconciliation/audit. Residuals can be sub-cent, so do not round them away into a decimal(18,2) field. Under ODQ-001, conversion residual is dynamically derived from immutable transaction inputs rather than stored as a redundant database column; if future reporting requires indexed residual queries, a generated/reporting representation can be added later. The old integer-cents proposal and gold (18,8) candidate are superseded.
 
 All financial records affecting one operation must commit atomically. Stable transaction identifiers, durable idempotency and concurrency-safe nonnegative wallet balances are required. Preserve immutable transaction/ledger history and price versions. Any future correction must use linked compensating entries, but v1 has no reversal capability.
 
@@ -39,9 +39,14 @@ This inventory does not decide identifiers' physical types, relationship cardina
 
 KycProfile/document verification, RecurringPlan, payment records, custody/redemption and general product/marketing notification models are outside v1. They are future concepts, not empty tables to scaffold. Identity verification and one-time email reset support are in scope through ASP.NET Core Identity; their concrete model follows OD-002/018 during identity design.
 
-## Next design gate
+## Detailed Design Specifications
 
-Use the approved limits, numeric precision/round-down, immediate price versions and reconfirmation, total-gram goals, verified identity and permanent successful idempotency as inputs. Derive domain model, ER diagram, REST representations and migration plan in that order. Resolve detailed residual representation, posting mechanics, day-boundary/timezone, canonicalization and concurrency behavior in design; do not reopen decided product rules. Validate [business flows](requirements/GOLD_SAVING_FLOW.md) before implementation. Open launch/legal periods do not block this conceptual work.
+Session 3 establishes the concrete specifications elaborated from this conceptual inventory:
+- [Domain Model](design/DOMAIN_MODEL.md): Core entities, value objects, and aggregate boundaries.
+- [Transaction Model](design/TRANSACTION_MODEL.md): Single-table financial transaction model and floor-to-8 decimal rounding.
+- [Financial Ledger Model](design/LEDGER_MODEL.md): Double-entry ledger with direction and positive amounts across isolated unit books.
+- [Relational Data Model & ERD](design/ERD.md): Detailed PostgreSQL tables, column types, check constraints, and partial unique indexes.
+- [Concurrency & Idempotency Design](design/CONCURRENCY.md): Pessimistic row locking for wallets and permanent idempotency retention.
 
 ## Conceptual chart of accounts — v1 only
 
