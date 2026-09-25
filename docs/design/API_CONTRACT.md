@@ -32,12 +32,14 @@ This document specifies the versioned REST API surface (`/api/v1/...`) for Nidhi
 
 | Group | Endpoint Count | Purpose |
 |---|---|---|
-| **Public / Authentication** | 8 | Visitor landing disclosures, registration, login, logout, verification, password recovery, antiforgery token. |
+| **Public / Authentication** | 9 | Visitor landing disclosures, registration, login, logout, verification, password recovery, antiforgery token, current user. |
 | **Customer** | 12 | Dashboard, profile, wallet, funding, price, gold saving, holdings, transactions, savings goal. |
 | **Administrator** | 9 | Operational dashboard, customer inspection, transaction/ledger review, price publication, audit trail. |
-| **Total** | **29** | Complete v1 capability set without speculative endpoints. |
+| **Total** | **30** | Complete v1 capability set without speculative endpoints. |
 
 ---
+
+The contract contains 8 implemented authentication endpoints plus 1 planned public endpoint, 12 planned customer endpoints and 9 planned administrator endpoints. The total of 30 is the v1 design surface, not the count of implemented business endpoints.
 
 ## 3. Public & Authentication Endpoints
 
@@ -110,7 +112,7 @@ This document specifies the versioned REST API surface (`/api/v1/...`) for Nidhi
 ---
 
 ### 3.4. `POST /api/v1/auth/logout`
-- **Description**: Ends the current authenticated session and clears the session cookie (OD-018, FR-AUTH-003).
+- **Description**: Revokes all sessions for the authenticated user and clears the current session cookie (OD-018, FR-AUTH-003).
 - **Authentication**: Authenticated (`CUSTOMER` or `ADMIN`).
 - **Request Body**: None.
 - **Responses**:
@@ -181,6 +183,26 @@ This document specifies the versioned REST API surface (`/api/v1/...`) for Nidhi
       "token": "CfDJ8...antiforgeryRequestToken..."
     }
     ```
+
+---
+
+### 3.9. `GET /api/v1/auth/me` — Session 5 contract addition
+- **Description**: Returns the current authenticated identity, for CUSTOMER or ADMIN. No Identity internals are exposed.
+- **Authentication**: Valid `.Nidhi.Session` cookie required; CUSTOMER or ADMIN, including unverified customers. No CSRF header is required for this GET.
+- **Response DTO**: `CurrentUserResponse`: `userId` (UUID), `email` (string), `displayName` (nullable string), `isEmailVerified` (boolean), `roles` (string array containing CUSTOMER or ADMIN).
+- **Responses**:
+  - `200 OK`: `{ "userId": "<uuid>", "email": "customer@example.com", "displayName": null, "isEmailVerified": false, "roles": ["CUSTOMER"] }`
+  - `401 Unauthorized`: `AUTHENTICATION_REQUIRED`.
+  - `500 Internal Server Error`: safe `INTERNAL_ERROR` Problem Details on unexpected failure.
+- Only the five DTO fields above are returned. Password hashes, security/concurrency stamps, verification/reset tokens and other Identity internals are excluded. `displayName` is nullable, including for an ADMIN without a customer profile.
+
+### Session 5 security semantics
+
+All auth responses have `Cache-Control: no-store`. All unsafe `/api` requests, including anonymous auth POSTs, require the `X-CSRF-TOKEN` header and paired antiforgery cookie. Missing/invalid evidence returns 400 `CSRF_VALIDATION_FAILED`; rate limits return 429 `RATE_LIMITED` and `Retry-After`. Auth failures use the standard Problem Details envelope. Registration can return 503 `IDENTITY_EMAIL_UNAVAILABLE`, rolling back the account for retry. Unexpected failures return safe 500 `INTERNAL_ERROR`.
+
+The session cookie is nonpersistent with a fixed eight-hour encrypted ticket lifetime, no sliding renewal and no remember-me. Secure is required outside Development (localhost HTTP remains supported in Development). Logout revokes all sessions for the current user through the Identity security stamp. Reset revokes existing sessions too. Fetch fresh antiforgery state after login/logout/reset or session expiration. Registration does not sign the user in. Verification/reset tokens expire after one hour and cannot be reused after success. Unverified users can login and use `me`; future financial APIs require the verified-CUSTOMER policy (authenticated CUSTOMER plus email confirmation checked in the database). ADMIN does not implicitly grant CUSTOMER access.
+
+See [DEVELOPMENT_AUTHENTICATION.md](../DEVELOPMENT_AUTHENTICATION.md) for local email pickup, production sender limitations, password/lockout/rate-limit settings, operational admin provisioning and API testing.
 
 ---
 

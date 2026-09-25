@@ -19,6 +19,7 @@ TestResults/
 .vs/
 
 # Local configuration and secrets
+.identity-emails/
 .env*
 !.env.example
 *.pem

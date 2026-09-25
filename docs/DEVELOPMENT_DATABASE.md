@@ -90,3 +90,5 @@ docker compose stop
 - Ledger balancing, LKR-entry cent granularity within the shared `numeric(20,8)` column, price freshness, daily limits, successful idempotency lifecycle, and cross-record snapshot consistency remain application responsibilities. No speculative triggers, accounts, roles, or credentials are seeded.
 
 Dependencies: EF Core, EF Design, and Identity EF storage 10.0.12; Npgsql EF provider 10.0.3; repository-local `dotnet-ef` 10.0.12. Domain has no persistence dependencies.
+
+Authentication configuration, CSRF flow, local identity-email pickup, and the ADMIN operational command are documented in [DEVELOPMENT_AUTHENTICATION.md](DEVELOPMENT_AUTHENTICATION.md).
