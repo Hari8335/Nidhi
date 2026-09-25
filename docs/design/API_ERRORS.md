@@ -30,7 +30,7 @@ All error responses from the Nidhi ASP.NET Core API return `Content-Type: applic
 - `instance`: The URI reference of the endpoint that originated the error.
 - `code`: Stable, enumerated machine-readable application error code.
 - `timestampUtc`: UTC timestamp when the error occurred.
-- `traceId`: W3C distributed trace identifier for log correlation and operational troubleshooting (NFR-OBS-001).
+- `traceId`: Current Activity identifier (W3C format when available), otherwise the HTTP request trace identifier, for log correlation and operational troubleshooting (NFR-OBS-001).
 - `errors`: Optional dictionary of field-level validation errors (used exclusively with `VALIDATION_ERROR`).
 
 ---
@@ -44,7 +44,7 @@ To eliminate ambiguity across client implementations and automated testing, Nidh
 | HTTP Status | Application Error Code | Meaning / Trigger Scenario |
 |---|---|---|
 | `401 Unauthorized` | `AUTHENTICATION_REQUIRED` | Request requires an authenticated session cookie, but no valid session was provided. |
-| `401 Unauthorized` | `INVALID_CREDENTIALS` | Login attempt failed due to invalid email or password. Does not disclose whether email exists. |
+| `401 Unauthorized` | `INVALID_CREDENTIALS` | Login attempt failed due to invalid email/password, account lockout, or an unsupported role set. Does not disclose whether email exists. |
 | `403 Forbidden` | `FORBIDDEN` | Authenticated caller does not have permission (e.g., Customer invoking an Admin endpoint). |
 | `403 Forbidden` | `EMAIL_NOT_VERIFIED` | Customer has registered but has not yet verified their email. Simulated financial features are blocked until verification (OD-002). |
 
@@ -54,13 +54,28 @@ To eliminate ambiguity across client implementations and automated testing, Nidh
 
 | HTTP Status | Application Error Code | Meaning / Trigger Scenario |
 |---|---|---|
-| `400 Bad Request` | `VALIDATION_ERROR` | Request body or parameters failed syntax/range/format rules. `errors` field contains field-level messages. |
-| `400 Bad Request` | `INVALID_TOKEN` | Password reset or email verification token is malformed, invalid, or expired. |
+| `400 Bad Request` | `VALIDATION_ERROR` | Request body or parameters failed syntax/range/format rules. Optional `errors` field contains safe field-level messages when available. |
+| `400 Bad Request` | `INVALID_TOKEN` | Password reset or email verification token is invalid, expired, wrong-account, or already used. Missing/oversized token fields instead fail request validation with `VALIDATION_ERROR`. |
 | `404 Not Found` | `RESOURCE_NOT_FOUND` | Requested entity (e.g., customer, transaction) does not exist or caller does not own it. |
 | `409 Conflict` | `EMAIL_ALREADY_EXISTS` | Registration attempt with an email that is already registered. |
 | `409 Conflict` | `ACTIVE_GOAL_ALREADY_EXISTS`| Attempt to create an active goal when an active goal already exists (and replace was not specified). |
 
 ---
+
+### Session 5 infrastructure errors
+
+| HTTP Status | Application Error Code | Meaning / Trigger Scenario |
+|---|---|---|
+| `400 Bad Request` | `CSRF_VALIDATION_FAILED` | Missing/invalid antiforgery header/cookie pair; fetch a fresh token. |
+| `405 Method Not Allowed` | `METHOD_NOT_ALLOWED` | Route exists but does not support the requested HTTP method. |
+| `415 Unsupported Media Type` | `UNSUPPORTED_MEDIA_TYPE` | Request body must use a supported JSON content type. |
+| `429 Too Many Requests` | `RATE_LIMITED` | Auth request limit exceeded; respect `Retry-After`. |
+| `503 Service Unavailable` | `IDENTITY_EMAIL_UNAVAILABLE` | Registration email delivery unavailable; registration rolls back and can be retried. Password recovery still returns its generic response. |
+| `500 Internal Server Error` | `INTERNAL_ERROR` | Unexpected failure with no framework exception or sensitive details in the response. |
+
+Session 5 uses the four authentication/authorization codes above, `VALIDATION_ERROR`, `INVALID_TOKEN`, `EMAIL_ALREADY_EXISTS`, and the six infrastructure codes in this table. Framework routing also uses `RESOURCE_NOT_FOUND`. Financial/design codes elsewhere in this catalog are not implemented authentication errors. Clients must branch on `code` and HTTP status, not human-readable `title`/`detail`; Session 5 may use the same safe text for both.
+
+Verification and password reset both retain `INVALID_TOKEN` for invalid, expired, wrong-account, or reused tokens.
 
 ### 2.3. Financial & Simulation Errors
 

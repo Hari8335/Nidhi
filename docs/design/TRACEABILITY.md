@@ -11,11 +11,11 @@ This document maps all v1 requirements to their domain concepts, API endpoints, 
 | **FR-PUB-001** (Understand Nidhi) | Marketing Content | Static / Landing Pages | None (Static) |
 | **FR-PUB-002** (Disclosures) | Simulation Disclosures | Public landing / footer | None (Static) |
 | **FR-AUTH-001** (Register Customer) | `IdentityUser`, `CustomerProfile`, `Wallet`, `GoldHolding` | `POST /api/v1/auth/register` | `asp_net_users`, `customer_profiles`, `wallets`, `gold_holdings` |
-| **FR-AUTH-002** (Login) | `IdentityUser`, HttpOnly Cookie | `POST /api/v1/auth/login` | `asp_net_users`, `asp_net_user_roles` |
-| **FR-AUTH-003** (Logout) | Session Invalidation | `POST /api/v1/auth/logout` | None (Cookie invalidated) |
+| **FR-AUTH-002** (Login) | `IdentityUser`, HttpOnly Cookie | `POST /api/v1/auth/login`, `GET /api/v1/auth/me` (current safe identity) | `asp_net_users`, `asp_net_user_roles` |
+| **FR-AUTH-003** (Logout) | Session Invalidation | `POST /api/v1/auth/logout` | `asp_net_users.security_stamp` (all sessions revoked; current cookie cleared) |
 | **FR-AUTH-004** (Account Protection)| Role Authorization, CSRF Defense | ASP.NET Core Authorize, `GET /api/v1/auth/antiforgery` | `asp_net_user_roles`, `asp_net_roles` |
-| **FR-AUTH-005** (Email Verification)| `IdentityUser.EmailConfirmed` | `POST /api/v1/auth/verify-email` | `asp_net_users`, `asp_net_user_tokens` |
-| **FR-AUTH-006** (Password Recovery) | `IdentityUser.PasswordHash` | `POST /api/v1/auth/forgot-password`, `reset-password` | `asp_net_users`, `asp_net_user_tokens` |
+| **FR-AUTH-005** (Email Verification)| `IdentityUser.EmailConfirmed` | `POST /api/v1/auth/verify-email` | `asp_net_users` (Data Protection tokens; no token-table persistence) |
+| **FR-AUTH-006** (Password Recovery) | `IdentityUser.PasswordHash` | `POST /api/v1/auth/forgot-password`, `reset-password` | `asp_net_users` (Data Protection tokens; no token-table persistence) |
 | **FR-AUTH-007** (Admin Provisioning)| Operational Bootstrapper | CLI / Seeder Command | `asp_net_users`, `asp_net_user_roles`, `audit_events` |
 | **FR-PROFILE-001** (Customer Profile)| `CustomerProfile` | `GET/PATCH /api/v1/customer/profile` | `customer_profiles` |
 | **FR-WALLET-001** (View Wallet) | `Wallet` | `GET /api/v1/customer/wallet` | `wallets` |
