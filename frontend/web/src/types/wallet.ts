@@ -19,14 +19,8 @@ export type FundingReceipt = {
   createdAtUtc: string;
 };
 
-export type TransactionSummary = {
-  transactionId: string;
-  type: string;
-  amountLkr: number;
-  goldQuantityGrams: number | null;
-  postOperationWalletBalanceLkr: number;
-  createdAtUtc: string;
-};
+import type { TransactionSummary } from "./transactions";
+export type { TransactionSummary } from "./transactions";
 
 export type DashboardData = {
   walletBalanceLkr: number;

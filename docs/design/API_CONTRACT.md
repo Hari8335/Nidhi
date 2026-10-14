@@ -208,7 +208,7 @@ See [DEVELOPMENT_AUTHENTICATION.md](../DEVELOPMENT_AUTHENTICATION.md) for local 
 
 ## 4. Customer Endpoints
 
-All customer endpoints require `[Authorize(Roles = "CUSTOMER")]`. Customer identity is derived from the session cookie.
+Customer identity is derived from the authenticated session principal. Session 9 holdings, transaction history and transaction detail require `AuthPolicies.VerifiedCustomer` (authenticated CUSTOMER plus current database email confirmation), consistent with FR-AUTH-004. ADMIN is not implicitly a CUSTOMER. Existing Session 7–8 dashboard, wallet summary and gold-price reads retain `AuthPolicies.Customer`; this historical exception is preserved without widening the new read endpoints. Financial mutations retain `AuthPolicies.VerifiedCustomer`.
 
 ### 4.1. `GET /api/v1/customer/profile`
 - **Description**: Returns the authenticated customer's profile.
@@ -377,7 +377,9 @@ All customer endpoints require `[Authorize(Roles = "CUSTOMER")]`. Customer ident
 ---
 
 ### 4.8. `GET /api/v1/customer/holdings`
-- **Description**: Returns customer's current total gold holdings and indicative valuation (FR-HOLDING-001).
+- **Description**: Returns the authenticated customer's persisted `GoldHolding.QuantityGrams` and current indicative simulation valuation (FR-HOLDING-001). Wallet balance remains in the existing `/customer/wallet` response; no wallet field is added here.
+- **Session 9 reconciliation**: Latest persisted price by `PublishedAtUtc` supplies current context. Only a price no older than 24 hours is usable for valuation. `indicativePortfolioValueLkr` is `quantityGrams * activePricePerGramLkr`, rounded to two decimal places using decimal midpoint-to-even for presentation only. It is not cost basis, profit/loss or a receipt value. Missing price returns HTTP 200 with quantity preserved, both price fields and valuation `null`, and `isPriceFresh: false`. Stale price preserves price/version context but returns valuation `null` and `isPriceFresh: false`. Zero quantity with a fresh price returns zero valuation. No current projection or historical receipt is mutated.
+- All Session 9 successful reads return `Cache-Control: no-store`; GET requires no CSRF header.
 - **Responses**:
   - `200 OK`:
     ```json
@@ -393,7 +395,9 @@ All customer endpoints require `[Authorize(Roles = "CUSTOMER")]`. Customer ident
 ---
 
 ### 4.9. `GET /api/v1/customer/transactions`
-- **Description**: Paginated transaction history for the authenticated customer (FR-TRANSACTION-001).
+- **Description**: Paginated transaction history for the authenticated customer (FR-TRANSACTION-001), queried from persisted `FinancialTransaction` rows. Deterministic newest-first ordering is `createdAtUtc DESC, transactionId DESC` (UUID tie-break).
+- **Session 9 reconciliation**: No filters or alternate sort modes are defined or implemented. `page` must be an integer >= 1; `pageSize` must be 1–100. Invalid or unparseable values return HTTP 400 `VALIDATION_ERROR` Problem Details. Beyond-last pages return an empty `items` array while retaining requested page and actual totals; empty history has `totalPages: 0`. Offset pages reflect current data, so concurrent new operations can shift later pages; this is not a snapshot/cursor contract.
+- Each item exposes exactly `transactionId`, `type`, `status` (`COMPLETED`), `amountLkr`, nullable `goldQuantityGrams`, nullable `appliedPricePerGramLkr`, `postOperationWalletBalanceLkr`, and `createdAtUtc`. Nullable gold fields are `null` for funding. Status is added to the earlier example to satisfy FR-TRANSACTION-001. Dashboard `recentTransactions` uses the same item DTO/order with at most five rows. Existing dashboard balance fields remain unchanged.
 - **Query Parameters**:
   - `page`: int (default `1`)
   - `pageSize`: int (default `20`, max `100`)
@@ -405,6 +409,7 @@ All customer endpoints require `[Authorize(Roles = "CUSTOMER")]`. Customer ident
         {
           "transactionId": "018f3a5b-7c2a-7182-9a3b-8c4d5e6f7a8f",
           "type": "GOLD_PURCHASE",
+          "status": "COMPLETED",
           "amountLkr": 100.00,
           "goldQuantityGrams": 0.00333333,
           "appliedPricePerGramLkr": 30000.0000,
@@ -424,8 +429,8 @@ All customer endpoints require `[Authorize(Roles = "CUSTOMER")]`. Customer ident
 ### 4.10. `GET /api/v1/customer/transactions/{id}`
 - **Description**: Detailed immutable receipt for a single customer transaction (FR-TRANSACTION-002, FR-GOLD-003).
 - **Responses**:
-  - `200 OK`: Full transaction receipt object including post-operation balances and exact applied price.
-  - `404 Not Found`: If transaction does not exist or does not belong to authenticated customer.
+  - `200 OK`: Exactly the original funding receipt fields from §4.5 or purchase receipt fields from §4.7, discriminated by `type`; gold fields are omitted for funding. All fields come from immutable `FinancialTransaction` snapshots. Purchase residual is derived only from original amount, grams and applied price (up to 12 decimals), never current price or balances. No ledger rows, customer ID, internal account IDs or idempotency metadata are exposed.
+  - `404 Not Found`: `RESOURCE_NOT_FOUND` with the same safe "Transaction not found." detail for nonexistent and foreign-owned transaction IDs. No existence leak.
 
 ---
 

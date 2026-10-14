@@ -1,4 +1,5 @@
 "use client";
+import { HoldingsSummary } from "./holdings-summary";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { api } from "@/lib/api/client";
 import { createPurchaseFlow } from "@/lib/gold/purchase-flow";
@@ -15,7 +16,8 @@ export function GoldPage() {
   const estimate = price ? truncateGoldPreview(Number(amount), price.pricePerGramLkr) : 0;
   const enabled = Boolean(price?.isFresh && price.isPurchasingEnabled && valid && !busy);
   return <div className="dashboard-root min-w-0">
-    <div className="page-heading"><p className="eyebrow">SIMULATED GOLD</p><h1>Buy simulated gold</h1><p>Convert simulated LKR into fractional simulated gold. No real money or gold custody.</p></div>
+    <div className="page-heading"><p className="eyebrow">SIMULATED GOLD</p><h1>Simulated gold</h1><p>Convert simulated LKR into fractional simulated gold. No real money or gold custody.</p></div>
+    <HoldingsSummary refreshKey={receipt?.transactionId} />
     {error && <div role="alert">{error}</div>}
     {price && <section className="dashboard-hero-card min-w-0">
       <p className="metric-label">Current simulated price</p><h2>{formatLkr(price.pricePerGramLkr)} / g</h2>

@@ -78,18 +78,8 @@ public sealed class WalletService(NidhiDbContext db) : IWalletService
         var gold = await db.GoldHoldings.AsNoTracking()
             .SingleAsync(h => h.CustomerId == customerId, ct);
 
-        var recent = await db.FinancialTransactions.AsNoTracking()
-            .Where(t => t.CustomerId == customerId)
-            .OrderByDescending(t => t.CreatedAtUtc)
-            .Take(5)
-            .Select(t => new TransactionSummary(
-                t.TransactionId,
-                t.Type.ToString(),
-                t.AmountLkr,
-                t.GoldQuantityGrams,
-                t.PostOperationWalletBalanceLkr,
-                t.CreatedAtUtc))
-            .ToListAsync(ct);
+        var recent = await Nidhi.Infrastructure.CustomerRecords.CustomerReadService.History(db, customerId)
+            .Take(5).Select(Nidhi.Infrastructure.CustomerRecords.CustomerReadService.Summary).ToListAsync(ct);
 
         return new DashboardResponse(wallet.BalanceLkr, gold.QuantityGrams, recent);
     }

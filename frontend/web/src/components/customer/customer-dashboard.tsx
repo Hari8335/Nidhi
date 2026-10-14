@@ -7,6 +7,7 @@ import { Alert, Button, Card, LoadingState, StatusBadge } from "@/components/ui/
 import { WalletFundingModal } from "@/components/wallet/wallet-funding-modal";
 import { api, ApiError } from "@/lib/api/client";
 import { formatLkr } from "@/lib/validation/wallet";
+import { TransactionList } from "@/components/transactions/transaction-list";
 import type { DashboardData } from "@/types/wallet";
 
 export function CustomerDashboard() {
@@ -127,27 +128,6 @@ export function CustomerDashboard() {
             </div>
           </section>
 
-          {/* Goal Teaser Card */}
-          <Card className="goal-teaser-card">
-            <div className="goal-header">
-              <div>
-                <p className="eyebrow">SAVINGS HABIT</p>
-                <h2>Start with a gold milestone</h2>
-                <p>Consistent, small contributions add up to tangible gold grams over time.</p>
-              </div>
-              <StatusBadge>Goal tracking soon</StatusBadge>
-            </div>
-            <div className="goal-meter-placeholder">
-              <div className="goal-bar">
-                <div className="goal-fill" style={{ width: "0%" }} />
-              </div>
-              <div className="goal-labels">
-                <span>0.0000g accumulated</span>
-                <span>Next milestone: 1.0000g</span>
-              </div>
-            </div>
-          </Card>
-
           {/* Recent Transactions Section */}
           <section className="transactions-section">
             <div className="section-header">
@@ -157,71 +137,12 @@ export function CustomerDashboard() {
               </span>
             </div>
 
-            {data.recentTransactions.length === 0 ? (
-              <Card className="empty-transactions-card">
-                <div className="empty-icon">🪙</div>
-                <h3>No simulated transactions yet</h3>
-                <p>
-                  Add simulated funds to your wallet to kickstart your saving journey and see
-                  your audit receipts here.
-                </p>
-                <Button
-                  className="button-primary mt-4"
-                  onClick={() => setFundingModalOpen(true)}
-                >
-                  Add First Funds
-                </Button>
-              </Card>
-            ) : (
-              <Card className="transactions-card">
-                <div className="transactions-table-wrapper">
-                  <table className="transactions-table">
-                    <thead>
-                      <tr>
-                        <th>Operation</th>
-                        <th>Amount</th>
-                        <th>Post-Balance</th>
-                        <th>Date & Time</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.recentTransactions.map((tx) => (
-                        <tr key={tx.transactionId}>
-                          <td>
-                            <div className="tx-type-cell">
-                              <span className="tx-icon">↓</span>
-                              <div>
-                                <span className="font-semibold block">
-                                  {tx.type === "WALLET_FUNDING" ? "Simulated Funding" : tx.type}
-                                </span>
-                                <span className="text-xs text-muted-foreground font-mono">
-                                  {tx.transactionId.slice(0, 8)}…
-                                </span>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="tx-amount-cell positive">
-                            +{formatLkr(tx.amountLkr)}
-                          </td>
-                          <td className="tx-balance-cell">
-                            {formatLkr(tx.postOperationWalletBalanceLkr)}
-                          </td>
-                          <td className="tx-date-cell">
-                            {new Date(tx.createdAtUtc).toLocaleString()}
-                          </td>
-                          <td>
-                            <StatusBadge>Completed</StatusBadge>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
-            )}
+            <TransactionList items={data.recentTransactions} />
+            <Link href="/transactions" className="button button-secondary">View all transactions</Link>
           </section>
-
+        </>
+      ) : null}
+      {data && (
           <WalletFundingModal
             isOpen={fundingModalOpen}
             onClose={() => setFundingModalOpen(false)}
@@ -229,8 +150,7 @@ export function CustomerDashboard() {
             currentBalance={data.walletBalanceLkr}
             isEmailVerified={user.isEmailVerified}
           />
-        </>
-      ) : null}
+      )}
     </div>
   );
 }
