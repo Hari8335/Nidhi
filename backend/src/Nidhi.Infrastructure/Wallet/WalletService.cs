@@ -249,7 +249,7 @@ public sealed class WalletService(NidhiDbContext db) : IWalletService
 
     public async Task<GoldPriceResponse> GetGoldPriceAsync(CancellationToken ct = default)
     {
-        var price = await db.GoldPrices.AsNoTracking().OrderByDescending(p => p.PublishedAtUtc).FirstOrDefaultAsync(ct);
+        var price = await db.GoldPrices.AsNoTracking().OrderByDescending(p => p.PublishedAtUtc).ThenByDescending(p => p.PriceVersionId).FirstOrDefaultAsync(ct);
         if (price is null) throw new WalletFailure("PRICE_UNAVAILABLE", 503, "No simulated gold price is currently available.");
         var fresh = DateTime.UtcNow - price.PublishedAtUtc <= TimeSpan.FromHours((double)PriceFreshnessHours);
         return new(price.PriceVersionId, price.PricePerGramLkr, price.PublishedAtUtc, fresh, fresh);
@@ -278,7 +278,7 @@ public sealed class WalletService(NidhiDbContext db) : IWalletService
         var idem = new IdempotencyRecord(customerId, IdempotencyOperation.SaveGold, idempotencyKey, hash, null, IdempotencyStatus.IN_PROGRESS, now, null);
         db.IdempotencyRecords.Add(idem);
         await db.SaveChangesAsync(ct);
-        var price = await db.GoldPrices.OrderByDescending(p => p.PublishedAtUtc).FirstOrDefaultAsync(ct);
+        var price = await db.GoldPrices.OrderByDescending(p => p.PublishedAtUtc).ThenByDescending(p => p.PriceVersionId).FirstOrDefaultAsync(ct);
         if (price is null) throw new WalletFailure("PRICE_UNAVAILABLE", 503, "No simulated gold price is currently available.");
         var fresh = DateTime.UtcNow - price.PublishedAtUtc <= TimeSpan.FromHours((double)PriceFreshnessHours);
         if (price.PriceVersionId != request.PriceVersionId) throw new WalletFailure("PRICE_CHANGED", 409, "The simulated gold price changed. Review the current price and confirm again.");

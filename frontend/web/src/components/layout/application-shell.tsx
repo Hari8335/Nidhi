@@ -1,4 +1,5 @@
 "use client";
+import { adminNavigation } from "@/lib/admin/presentation";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
@@ -35,8 +36,8 @@ export function ApplicationShell({ role, children }: { role: Role; children: Rea
     } finally { setBusy(false); }
   }
   const admin = role === "ADMIN";
-  const future = admin ? ["Customers", "Transactions", "Ledger", "Gold Prices", "Audit Logs"] : [];
-  const nav = <><Link href={expectedHome} aria-current={pathname === expectedHome ? "page" : undefined}>{admin ? "Overview" : "Dashboard"}</Link>{!admin && <><Link href="/wallet" aria-current={pathname === "/wallet" ? "page" : undefined}>Wallet</Link><Link href="/gold" aria-current={pathname === "/gold" ? "page" : undefined}>Gold</Link><Link href="/transactions" aria-current={pathname.startsWith("/transactions") ? "page" : undefined}>Transactions</Link></>}{future.map(label => <span key={label} aria-disabled="true">{label}<small>Soon</small></span>)}{!admin && <><Link href="/goals" aria-current={pathname === "/goals" ? "page" : undefined}>Savings Goals</Link><Link href="/profile" aria-current={pathname === "/profile" ? "page" : undefined}>Profile</Link></>}</>;
+  const adminLinks = admin ? adminNavigation.slice(1) : [];
+  const nav = <><Link href={expectedHome} aria-current={pathname === expectedHome ? "page" : undefined}>Dashboard</Link>{!admin && <><Link href="/wallet" aria-current={pathname === "/wallet" ? "page" : undefined}>Wallet</Link><Link href="/gold" aria-current={pathname === "/gold" ? "page" : undefined}>Gold</Link><Link href="/transactions" aria-current={pathname.startsWith("/transactions") ? "page" : undefined}>Transactions</Link></>}{adminLinks.map(([label, href]) => <Link key={href} href={href} aria-current={pathname.startsWith(href) ? "page" : undefined}>{label}</Link>)}{!admin && <><Link href="/goals" aria-current={pathname === "/goals" ? "page" : undefined}>Savings Goals</Link><Link href="/profile" aria-current={pathname === "/profile" ? "page" : undefined}>Profile</Link></>}</>;
   return <div className={`application ${admin ? "admin-application" : "customer-application"}`}>
     <aside className="sidebar"><Brand /><p className="eyebrow">{admin ? "ADMINISTRATION" : "YOUR SAVING SPACE"}</p><nav aria-label={admin ? "Administration" : "Customer"}>{nav}</nav><p className="sidebar-note">A considered start.<br />One small step at a time.</p></aside>
     <div className="application-body"><header className="application-header"><div className="mobile-brand"><Brand /></div><StatusBadge>{admin ? "Administrator" : "Customer account"}</StatusBadge><div className="account-summary"><span>{session.user.displayName || session.user.email}</span><Button className="button-secondary" onClick={() => void logout()} busy={busy}>Sign out</Button></div></header>

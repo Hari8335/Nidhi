@@ -1,2 +1,2 @@
-import { AccountOverview } from "@/components/auth/account-overview";
-export default function Page() { return <AccountOverview admin />; }
+import { AdminDashboardPage } from "@/components/admin/admin-pages";
+export default function Page() { return <AdminDashboardPage />; }

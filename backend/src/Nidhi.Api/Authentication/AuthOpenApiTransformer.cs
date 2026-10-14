@@ -33,6 +33,24 @@ public sealed class AuthOpenApiTransformer : IOpenApiDocumentTransformer
                     operation.Security = [new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference("IdentityCookie", document)] = [] }];
             }
         }
+        foreach (var (_, item) in document.Paths.Where(x => x.Key.StartsWith("/api/v1/admin/", StringComparison.Ordinal)))
+        {
+            foreach (var (method, operation) in item.Operations!)
+            {
+                operation.Security = [new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference("IdentityCookie", document)] = [] }];
+                operation.Description = "Requires ADMIN. Responses are not cached. Inspection is read-only; only price publication changes state.";
+                if (method == HttpMethod.Post)
+                {
+                    operation.Parameters ??= [];
+                    operation.Parameters.Add(new OpenApiParameter
+                    {
+                        Name = "X-CSRF-TOKEN", In = ParameterLocation.Header, Required = true,
+                        Description = "Antiforgery request token paired with the .Nidhi.Antiforgery cookie.",
+                        Schema = new OpenApiSchema { Type = JsonSchemaType.String }
+                    });
+                }
+            }
+        }
         return Task.CompletedTask;
     }
 }

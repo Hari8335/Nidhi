@@ -28,7 +28,7 @@ public sealed class CustomerReadService(NidhiDbContext db) : ICustomerReadServic
         var id = CustomerId(principal);
         var quantity = await db.GoldHoldings.AsNoTracking().Where(h => h.CustomerId == id)
             .Select(h => h.QuantityGrams).SingleAsync(ct);
-        var price = await db.GoldPrices.AsNoTracking().OrderByDescending(p => p.PublishedAtUtc)
+        var price = await db.GoldPrices.AsNoTracking().OrderByDescending(p => p.PublishedAtUtc).ThenByDescending(p => p.PriceVersionId)
             .FirstOrDefaultAsync(ct);
         var fresh = price is not null && DateTime.UtcNow - price.PublishedAtUtc <= TimeSpan.FromHours(24);
         // Display-only rounding; neither holding nor immutable receipts are changed.
