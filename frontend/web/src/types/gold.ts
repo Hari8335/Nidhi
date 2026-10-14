@@ -1,0 +1,2 @@
+export type GoldPrice = { priceVersionId: string; pricePerGramLkr: number; publishedAtUtc: string; isFresh: boolean; isPurchasingEnabled: boolean };
+export type GoldPurchaseReceipt = { transactionId: string; type: string; status: string; amountLkr: number; priceVersionId: string; appliedPricePerGramLkr: number; goldQuantityGrams: number; conversionResidualLkr: number; postOperationWalletBalanceLkr: number; postOperationGoldHoldingGrams: number; createdAtUtc: string };
