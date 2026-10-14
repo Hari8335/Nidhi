@@ -2683,3 +2683,21 @@ nav small {
 .goal-progress { height: .65rem; border-radius: 1rem; background: #eee8da; overflow: hidden; }
 .goal-progress span { display: block; height: 100%; background: #9b772f; border-radius: inherit; }
 .goal-form form { max-width: 32rem; display: grid; gap: 1rem; }
+
+/* Administrative inspection: readable records at every width, separate unit books. */
+.admin-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.admin-number { font-size: 2.5rem; font-weight: 600; }
+.admin-records { display: grid; gap: 1rem; }
+.admin-records .card, .admin-fields, .admin-reference { min-width: 0; overflow-wrap: anywhere; }
+.admin-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin: 1rem 0; }
+.admin-fields dt { font-size: .8rem; color: var(--muted-foreground); margin-bottom: .25rem; }
+.admin-fields dd { margin: 0; font-variant-numeric: tabular-nums; }
+.admin-filters { display: flex; flex-wrap: wrap; gap: 1rem; align-items: end; }
+.admin-filters label { flex: 1 1 200px; display: grid; gap: .4rem; }
+.admin-filters input, .admin-filters select, .admin-price-form input, .admin-price-form textarea { width: 100%; min-width: 0; border: 1px solid var(--border); background: var(--surface-elevated); border-radius: .5rem; padding: .75rem; color: var(--foreground); font: inherit; }
+.admin-price-form { display: grid; gap: .75rem; max-width: 42rem; }
+.admin-price-form textarea { min-height: 6rem; }
+.admin-confirm { border-left: 3px solid var(--gold); padding: 1rem; background: var(--surface-elevated); }
+.admin-confirm .button { margin: .25rem; }
+.admin-posting { border-top: 1px solid var(--border); margin-top: 1rem; }
+@media (max-width: 600px) { .admin-fields, .admin-metrics { grid-template-columns: minmax(0, 1fr); } .admin-filters { display: grid; } }

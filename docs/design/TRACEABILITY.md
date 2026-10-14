@@ -148,3 +148,7 @@ FR-HOLDING-001 is implemented through `/customer/holdings` using persisted `Gold
 ## Session 10 implementation
 
 FR-GOAL-001/002 and US-GOAL-001/002 use the existing SavingsGoal and partial unique active-customer index, verified-CUSTOMER GET/POST `/customer/savings-goal`, `/goals`, and the Dashboard goal card. PostgreSQL `SavingsGoalTests` cover concurrent creation, ownership, exact persistence, no financial mutation and actual Session 8 purchase progress; `GoalProgressTests` exercise decimal completion and visual capping. No edit/delete/replacement is in approved v1 scope. See [SESSION_10_REPORT.md](../SESSION_10_REPORT.md).
+
+## Session 11 implementation evidence
+
+FR-ADMIN-001–006 and FR-AUDIT-001/002 are implemented by AdminController → IAdminService → EF Core AdminService. The nine approved routes support dashboard, customer oversight, immutable transaction/associated ledger inspection, price history/publication and audit review. The existing Next.js ADMIN shell exposes all six operational destinations. AdminTests validates PostgreSQL role separation, DTO privacy/search/pagination, receipts, unit-separated ledger, immutable publication and atomic audit rollback, no-price behavior, concurrent/tied publication ordering, and actual customer PRICE_CHANGED/reconfirmation. Frontend admin tests cover exact decimal mapping/validation and shared cookie/CSRF client. See [SESSION_11_REPORT.md](../SESSION_11_REPORT.md) for final results and reconciliation boundaries.
