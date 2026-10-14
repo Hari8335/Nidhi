@@ -1,2 +1,5 @@
-import { AccountOverview } from "@/components/auth/account-overview";
-export default function Page() { return <AccountOverview  />; }
+import { CustomerDashboard } from "@/components/customer/customer-dashboard";
+
+export default function Page() {
+  return <CustomerDashboard />;
+}
