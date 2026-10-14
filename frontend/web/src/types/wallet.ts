@@ -26,4 +26,5 @@ export type DashboardData = {
   walletBalanceLkr: number;
   goldHoldingGrams: number;
   recentTransactions: TransactionSummary[];
+  activeGoal: import("../lib/goals/presentation").SavingsGoal | null;
 };

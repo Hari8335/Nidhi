@@ -81,7 +81,9 @@ public sealed class WalletService(NidhiDbContext db) : IWalletService
         var recent = await Nidhi.Infrastructure.CustomerRecords.CustomerReadService.History(db, customerId)
             .Take(5).Select(Nidhi.Infrastructure.CustomerRecords.CustomerReadService.Summary).ToListAsync(ct);
 
-        return new DashboardResponse(wallet.BalanceLkr, gold.QuantityGrams, recent);
+        var goal = await db.SavingsGoals.AsNoTracking().SingleOrDefaultAsync(g => g.CustomerId == customerId && g.Status == GoalStatus.ACTIVE, ct);
+        return new DashboardResponse(wallet.BalanceLkr, gold.QuantityGrams, recent,
+            goal is null ? null : Nidhi.Application.SavingsGoals.GoalResponse.From(goal, gold.QuantityGrams));
     }
 
     public async Task<(FundingReceiptResponse Receipt, bool IsReplay)> FundWalletAsync(

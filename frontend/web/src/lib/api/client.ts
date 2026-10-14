@@ -22,6 +22,7 @@ const messages: Record<string, string> = {
   PRICE_STALE: "The simulated gold price is temporarily stale. Please refresh and try again later.",
   PRICE_CHANGED: "The simulated gold price changed. Review the current price and confirm again.",
   INSUFFICIENT_SIMULATED_FUNDS: "Your simulated wallet balance is insufficient for this purchase.",
+  ACTIVE_GOAL_ALREADY_EXISTS: "You already have a savings goal. Refresh to view it.",
   GOLD_QUANTITY_ZERO: "This amount would result in zero simulated gold. Increase the amount and try again.",
 };
 export function parseProblem(value: unknown): ProblemDetails {
@@ -55,7 +56,7 @@ export function createApiClient(base = apiBase, fetcher: typeof fetch = (...args
   let csrf: Promise<string> | undefined;
   let identityVersion = 0;
   const clearCsrf = () => { csrf = undefined; identityVersion++; };
-  async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  async function request<T>(path: string, init?: RequestInit, decode?: (text: string) => T): Promise<T> {
     const requestIdentity = identityVersion;
     let response: Response;
     try {
@@ -70,7 +71,7 @@ export function createApiClient(base = apiBase, fetcher: typeof fetch = (...args
       throw new ApiError(response.status, problem, response.headers.get("Retry-After"));
     }
     if (response.status === 204) return undefined as T;
-    try { return await response.json() as T; } catch { throw new ApiError(502); }
+    try { return decode ? decode(await response.text()) : await response.json() as T; } catch { throw new ApiError(502); }
   }
   function token() {
     csrf ??= request<{ token: string }>("/auth/antiforgery").then(result => {
@@ -79,7 +80,7 @@ export function createApiClient(base = apiBase, fetcher: typeof fetch = (...args
     }).catch(error => { clearCsrf(); throw error; });
     return csrf;
   }
-  async function post<T>(path: string, body?: unknown, headers?: Record<string, string>): Promise<T> {
+  async function post<T>(path: string, body?: unknown, headers?: Record<string, string>, decode?: (text: string) => T): Promise<T> {
     for (let attempt = 0; ; attempt++) {
       try {
         const result = await request<T>(path, {
@@ -90,7 +91,7 @@ export function createApiClient(base = apiBase, fetcher: typeof fetch = (...args
             ...headers,
           },
           body: body === undefined ? undefined : JSON.stringify(body),
-        });
+        }, decode);
         if (["/auth/login", "/auth/logout", "/auth/reset-password"].includes(path)) clearCsrf();
         return result;
       } catch (error) {
@@ -100,6 +101,6 @@ export function createApiClient(base = apiBase, fetcher: typeof fetch = (...args
       }
     }
   }
-  return { get: <T>(path: string) => request<T>(path), post, clearCsrf };
+  return { get: <T>(path: string, decode?: (text: string) => T) => request<T>(path, undefined, decode), post, clearCsrf };
 }
 export const api = createApiClient();

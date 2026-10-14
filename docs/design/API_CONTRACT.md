@@ -208,7 +208,7 @@ See [DEVELOPMENT_AUTHENTICATION.md](../DEVELOPMENT_AUTHENTICATION.md) for local 
 
 ## 4. Customer Endpoints
 
-Customer identity is derived from the authenticated session principal. Session 9 holdings, transaction history and transaction detail require `AuthPolicies.VerifiedCustomer` (authenticated CUSTOMER plus current database email confirmation), consistent with FR-AUTH-004. ADMIN is not implicitly a CUSTOMER. Existing Session 7–8 dashboard, wallet summary and gold-price reads retain `AuthPolicies.Customer`; this historical exception is preserved without widening the new read endpoints. Financial mutations retain `AuthPolicies.VerifiedCustomer`.
+Customer identity is derived from the authenticated session principal. Session 9 holdings, transaction history and transaction detail, and Session 10 savings-goal reads and creation require `AuthPolicies.VerifiedCustomer` (authenticated CUSTOMER plus current database email confirmation), consistent with FR-AUTH-004. ADMIN is not implicitly a CUSTOMER. Existing Session 7–8 dashboard, wallet summary and gold-price reads retain `AuthPolicies.Customer`; this historical exception is preserved without widening the new read endpoints. Financial mutations retain `AuthPolicies.VerifiedCustomer`.
 
 ### 4.1. `GET /api/v1/customer/profile`
 - **Description**: Returns the authenticated customer's profile.
@@ -275,6 +275,8 @@ Customer identity is derived from the authenticated session principal. Session 9
     ```
 
 ---
+
+Session 10 extends the existing dashboard response with `activeGoal`: null or the complete §4.11 goal DTO, including current holding, UTC target date and capped visual percentage. It uses the same persisted holding snapshot as the dashboard quantity. The existing dashboard read policy is preserved. Goals-page reads and creation require VerifiedCustomer.
 
 ### 4.4. `GET /api/v1/customer/wallet`
 - **Description**: Returns wallet balance, caps, and remaining funding allowance for the current UTC day (FR-WALLET-001).
@@ -452,11 +454,13 @@ Customer identity is derived from the authenticated session principal. Session 9
     }
     ```
   - `200 OK` (with `null` goal if no active goal exists): `{"goal": null}`
+  - `503 Service Unavailable`: `HOLDING_UNAVAILABLE`.
+  - Both goal endpoints require verified CUSTOMER; anonymous/unverified/ADMIN requests receive existing 401/403 Problem Details. Creation requires the existing CSRF token.
 
 ---
 
 ### 4.12. `POST /api/v1/customer/savings-goal`
-- **Description**: Creates or replaces an active savings goal (OD-008, FR-GOAL-001). Replaces any existing active goal by archiving it as `REPLACED`.
+- **Description**: Creates one active savings goal (OD-008, FR-GOAL-001, US-GOAL-001). An existing active goal, including an achieved goal, returns `409 ACTIVE_GOAL_ALREADY_EXISTS`; no replacement, editing or deletion exists in v1 (MVP_SCOPE).
 - **Request Body**:
   ```json
   {
@@ -464,10 +468,16 @@ Customer identity is derived from the authenticated session principal. Session 9
     "targetDateUtc": "2026-12-31T00:00:00.000Z"
   }
   ```
-  *(Note: `targetDateUtc` is optional).*
+  `targetGrams` must be positive, less than 1,000,000,000,000 and have at most 8 decimal places, preserving decimal(20,8). Excess scale is rejected, including excess trailing zero places. JSON decimal numbers and exact decimal strings are accepted for this field so browser clients can submit the full precision without floating-point conversion. Unsupported properties, including customer identity, are rejected.
+
+  `targetDateUtc` is optional/null. When supplied, it must be a valid UTC timestamp ending in `Z`; no date-only value or timezone conversion is accepted by the API. The date is advisory: past dates are allowed, there is no future-date restriction in the approved requirements, and completion depends only on current holding. The browser date picker sends the chosen calendar date at UTC midnight and renders it in UTC.
+
+  Completion is derived without changing `Status = ACTIVE`; an achieved goal remains visible and prevents another creation. Progress uses decimal current persisted holding / target, with actual percentage uncapped and visual percentage capped at 100. No financial mutation, reservation or financial idempotency record is created.
 - **Responses**:
   - `201 Created`: Returns the newly active savings goal object.
-  - `400 Bad Request`: `VALIDATION_ERROR` (targetGrams <= 0).
+  - `400 Bad Request`: `VALIDATION_ERROR` (invalid target precision/range, UTC timestamp or unsupported properties).
+  - `409 Conflict`: `ACTIVE_GOAL_ALREADY_EXISTS` (including concurrent creation).
+  - `503 Service Unavailable`: `HOLDING_UNAVAILABLE` (missing holding is not treated as zero).
 
 ---
 

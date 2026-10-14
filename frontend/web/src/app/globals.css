@@ -2672,3 +2672,14 @@ nav small {
   .dashboard-hero-card { padding: 20px; }
   .metric-box { padding: 16px; }
 }
+
+/* Savings goals: exact quantities wrap without overflowing narrow screens. */
+.goal-card, .goal-form { min-width: 0; margin-block: 1.5rem; }
+.goal-card h2, .goal-form h2 { margin-bottom: 1rem; }
+.goal-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: 1rem; margin-block: 1.5rem; }
+.goal-metrics dt { color: var(--muted-foreground); font-size: .875rem; }
+.goal-metrics dd { font-size: 1.15rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.goal-card p { overflow-wrap: anywhere; margin-block: .75rem; }
+.goal-progress { height: .65rem; border-radius: 1rem; background: #eee8da; overflow: hidden; }
+.goal-progress span { display: block; height: 100%; background: #9b772f; border-radius: inherit; }
+.goal-form form { max-width: 32rem; display: grid; gap: 1rem; }
