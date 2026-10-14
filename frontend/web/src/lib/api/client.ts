@@ -18,6 +18,11 @@ const messages: Record<string, string> = {
   WALLET_LIMIT_EXCEEDED: "This funding would cause your wallet balance to exceed the maximum cap of LKR 5,000,000.00.",
   IDEMPOTENCY_CONFLICT: "This idempotency key was previously submitted with different details.",
   OPERATION_IN_PROGRESS: "A funding request is already in progress. Please retry in a few moments.",
+  PRICE_UNAVAILABLE: "The simulated gold price is temporarily unavailable. Please try again later.",
+  PRICE_STALE: "The simulated gold price is temporarily stale. Please refresh and try again later.",
+  PRICE_CHANGED: "The simulated gold price changed. Review the current price and confirm again.",
+  INSUFFICIENT_SIMULATED_FUNDS: "Your simulated wallet balance is insufficient for this purchase.",
+  GOLD_QUANTITY_ZERO: "This amount would result in zero simulated gold. Increase the amount and try again.",
 };
 export function parseProblem(value: unknown): ProblemDetails {
   if (!value || typeof value !== "object") return {};

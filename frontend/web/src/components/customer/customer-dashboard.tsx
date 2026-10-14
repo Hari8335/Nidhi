@@ -86,7 +86,7 @@ export function CustomerDashboard() {
               <div className="metric-box gold-metric">
                 <div className="metric-header">
                   <span className="metric-label">Simulated Gold Holdings</span>
-                  <StatusBadge>24K 99.9%</StatusBadge>
+                  <StatusBadge>Simulated</StatusBadge>
                 </div>
                 <div className="metric-value-row">
                   <span className="metric-large-number">
@@ -94,7 +94,7 @@ export function CustomerDashboard() {
                   </span>
                   <span className="metric-unit">grams</span>
                 </div>
-                <p className="metric-subtext">Estimated value: LKR 0.00</p>
+                <p className="metric-subtext">Simulated gold quantity from your account</p>
               </div>
 
               {/* Wallet Balance */}
@@ -120,13 +120,7 @@ export function CustomerDashboard() {
               >
                 + Add Simulated Funds
               </Button>
-              <Button
-                className="button-secondary"
-                disabled
-                title="Gold purchasing available in Session 8"
-              >
-                Buy Gold <small className="soon-badge">Session 8</small>
-              </Button>
+              <Link href="/gold" className="button-secondary">Buy Simulated Gold</Link>
               <Link href="/wallet" className="view-wallet-link">
                 View Wallet Details →
               </Link>

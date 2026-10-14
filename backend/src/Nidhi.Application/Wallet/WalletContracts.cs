@@ -48,6 +48,10 @@ public sealed record DashboardResponse(
     decimal GoldHoldingGrams,
     IReadOnlyList<TransactionSummary> RecentTransactions);
 
+public sealed record GoldPurchaseRequest([Required] decimal AmountLkr, [Required] Guid PriceVersionId);
+public sealed record GoldPriceResponse(Guid PriceVersionId, decimal PricePerGramLkr, DateTime PublishedAtUtc, bool IsFresh, bool IsPurchasingEnabled);
+public sealed record GoldPurchaseReceiptResponse(Guid TransactionId, string Type, string Status, decimal AmountLkr, Guid PriceVersionId, decimal AppliedPricePerGramLkr, decimal GoldQuantityGrams, decimal ConversionResidualLkr, decimal PostOperationWalletBalanceLkr, decimal PostOperationGoldHoldingGrams, DateTime CreatedAtUtc);
+
 // ── Failures ──────────────────────────────────────────────────────────────────
 
 /// <summary>Business-rule violation thrown by the wallet funding use-case.</summary>
@@ -73,4 +77,6 @@ public interface IWalletService
         FundWalletRequest request,
         string idempotencyKey,
         CancellationToken ct = default);
+    Task<GoldPriceResponse> GetGoldPriceAsync(CancellationToken ct = default);
+    Task<(GoldPurchaseReceiptResponse Receipt, bool IsReplay)> PurchaseGoldAsync(ClaimsPrincipal principal, GoldPurchaseRequest request, string idempotencyKey, CancellationToken ct = default);
 }

@@ -39,6 +39,9 @@ public sealed class WalletService(NidhiDbContext db) : IWalletService
 
     // Ledger account numbers per LEDGER_MODEL.md §3
     private const string SysFundingAccountNumber = "1001-LKR-SYS-FUNDING";
+    private const string SysClearingAccountNumber = "2002-LKR-SYS-CLEARING";
+    private const string SysGoldIssuanceAccountNumber = "1501-GOLD-SYS-ISSUANCE";
+    private const decimal PriceFreshnessHours = 24m;
 
     // ── IWalletService ─────────────────────────────────────────────────────
 
@@ -251,6 +254,69 @@ public sealed class WalletService(NidhiDbContext db) : IWalletService
 
         return (ToReceipt(financialTx), false);
     }
+
+    public async Task<GoldPriceResponse> GetGoldPriceAsync(CancellationToken ct = default)
+    {
+        var price = await db.GoldPrices.AsNoTracking().OrderByDescending(p => p.PublishedAtUtc).FirstOrDefaultAsync(ct);
+        if (price is null) throw new WalletFailure("PRICE_UNAVAILABLE", 503, "No simulated gold price is currently available.");
+        var fresh = DateTime.UtcNow - price.PublishedAtUtc <= TimeSpan.FromHours((double)PriceFreshnessHours);
+        return new(price.PriceVersionId, price.PricePerGramLkr, price.PublishedAtUtc, fresh, fresh);
+    }
+
+    public async Task<(GoldPurchaseReceiptResponse Receipt, bool IsReplay)> PurchaseGoldAsync(ClaimsPrincipal principal, GoldPurchaseRequest request, string idempotencyKey, CancellationToken ct = default)
+    {
+        var customerId = ResolveCustomerId(principal);
+        var amount = ValidateGoldAmount(request.AmountLkr);
+        var hash = ComputeGoldRequestHash(amount, request.PriceVersionId);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        var wallet = await db.Wallets.FromSqlRaw("SELECT id, customer_id, balance_lkr, xmin, created_at_utc, updated_at_utc FROM wallets WHERE customer_id = {0} FOR UPDATE", customerId).SingleAsync(ct);
+        var existing = await db.IdempotencyRecords.SingleOrDefaultAsync(r => r.CustomerId == customerId && r.Operation == IdempotencyOperation.SaveGold && r.IdempotencyKey == idempotencyKey, ct);
+        if (existing is not null)
+        {
+            if (existing.Status == IdempotencyStatus.COMPLETED)
+            {
+                if (existing.RequestHash != hash) throw new WalletFailure("IDEMPOTENCY_CONFLICT", 409, "This idempotency key was previously used with different purchase details.");
+                var original = await db.FinancialTransactions.AsNoTracking().SingleAsync(t => t.IdempotencyRecordId == existing.IdempotencyRecordId, ct);
+                await tx.CommitAsync(ct);
+                return (ToGoldReceipt(original), true);
+            }
+            throw new WalletFailure("OPERATION_IN_PROGRESS", 409, "A purchase with this idempotency key is already in progress.");
+        }
+        var now = DateTime.UtcNow;
+        var idem = new IdempotencyRecord(customerId, IdempotencyOperation.SaveGold, idempotencyKey, hash, null, IdempotencyStatus.IN_PROGRESS, now, null);
+        db.IdempotencyRecords.Add(idem);
+        await db.SaveChangesAsync(ct);
+        var price = await db.GoldPrices.OrderByDescending(p => p.PublishedAtUtc).FirstOrDefaultAsync(ct);
+        if (price is null) throw new WalletFailure("PRICE_UNAVAILABLE", 503, "No simulated gold price is currently available.");
+        var fresh = DateTime.UtcNow - price.PublishedAtUtc <= TimeSpan.FromHours((double)PriceFreshnessHours);
+        if (price.PriceVersionId != request.PriceVersionId) throw new WalletFailure("PRICE_CHANGED", 409, "The simulated gold price changed. Review the current price and confirm again.");
+        if (!fresh) throw new WalletFailure("PRICE_STALE", 503, "The simulated gold price is temporarily stale.");
+        if (wallet.BalanceLkr < amount) throw new WalletFailure("INSUFFICIENT_SIMULATED_FUNDS", 422, "Your simulated wallet balance is insufficient.");
+        var grams = GoldPurchaseCalculations.TruncateToEightDecimals(amount, price.PricePerGramLkr);
+        if (grams == 0m) throw new WalletFailure("GOLD_QUANTITY_ZERO", 422, "The purchase would result in zero simulated gold grams.");
+        var holding = await db.GoldHoldings.FromSqlRaw("SELECT id, customer_id, quantity_grams, xmin, created_at_utc, updated_at_utc FROM gold_holdings WHERE customer_id = {0} FOR UPDATE", customerId).SingleAsync(ct);
+        var previousWallet = wallet.BalanceLkr; var previousGold = holding.QuantityGrams;
+        wallet.ApplyFunding(-amount, now); holding.ApplyPurchase(grams, now);
+        db.Wallets.Update(wallet); db.GoldHoldings.Update(holding);
+        var financial = new FinancialTransaction(customerId, TransactionType.GOLD_PURCHASE, TransactionStatus.COMPLETED, amount, grams, price.PriceVersionId, price.PricePerGramLkr, wallet.BalanceLkr, holding.QuantityGrams, idem.IdempotencyRecordId, now);
+        db.FinancialTransactions.Add(financial);
+        var accounts = await GetOrCreatePurchaseAccounts(customerId, now, ct);
+        db.LedgerEntries.AddRange(new LedgerEntry(financial.TransactionId, accounts.CustomerLkr.AccountId, LedgerUnit.LKR, EntryDirection.DEBIT, amount, now), new LedgerEntry(financial.TransactionId, accounts.Clearing.AccountId, LedgerUnit.LKR, EntryDirection.CREDIT, amount, now), new LedgerEntry(financial.TransactionId, accounts.GoldIssuance.AccountId, LedgerUnit.GOLD_GRAMS, EntryDirection.DEBIT, grams, now), new LedgerEntry(financial.TransactionId, accounts.CustomerGold.AccountId, LedgerUnit.GOLD_GRAMS, EntryDirection.CREDIT, grams, now));
+        MarkIdempotencyCompleted(idem, financial.TransactionId, now); db.IdempotencyRecords.Update(idem);
+        await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
+        return (ToGoldReceipt(financial), false);
+    }
+
+    private async Task<(LedgerAccount CustomerLkr, LedgerAccount Clearing, LedgerAccount GoldIssuance, LedgerAccount CustomerGold)> GetOrCreatePurchaseAccounts(Guid customerId, DateTime now, CancellationToken ct)
+    {
+        async Task<LedgerAccount> Get(string number, string name, LedgerUnit unit, AccountClassification classification)
+        { var a = await db.LedgerAccounts.SingleOrDefaultAsync(x => x.AccountNumber == number, ct); if (a is null) { a = new LedgerAccount(number, name, unit, classification, number.Contains("CUST") ? customerId : null, now); db.LedgerAccounts.Add(a); } return a; }
+        return (await Get($"2001-LKR-CUST-{customerId}", "Customer Simulated Wallet", LedgerUnit.LKR, AccountClassification.LIABILITY), await Get(SysClearingAccountNumber, "Gold Conversion Clearing Account", LedgerUnit.LKR, AccountClassification.CLEARING), await Get(SysGoldIssuanceAccountNumber, "System Gold Issuance Source", LedgerUnit.GOLD_GRAMS, AccountClassification.ASSET), await Get($"2501-GOLD-CUST-{customerId}", "Customer Simulated Gold Holding", LedgerUnit.GOLD_GRAMS, AccountClassification.ASSET));
+    }
+
+    private static decimal ValidateGoldAmount(decimal amount) { if (amount * 100m != decimal.Truncate(amount * 100m) || amount < 100m || amount > 1000000m) throw new WalletFailure("VALIDATION_ERROR", 400, "Purchase amount must be between LKR 100.00 and LKR 1,000,000.00 with at most 2 decimal places."); return decimal.Round(amount, 2); }
+    private static string ComputeGoldRequestHash(decimal amount, Guid price) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"GOLD_PURCHASE|amountLkr={amount:F2}|priceVersionId={price:D}"))).ToLowerInvariant();
+    private static GoldPurchaseReceiptResponse ToGoldReceipt(FinancialTransaction t) => new(t.TransactionId, t.Type.ToString(), t.Status.ToString(), t.AmountLkr, t.PriceVersionId!.Value, t.AppliedPricePerGramLkr!.Value, t.GoldQuantityGrams!.Value, t.AmountLkr - (t.GoldQuantityGrams.Value * t.AppliedPricePerGramLkr.Value), t.PostOperationWalletBalanceLkr, t.PostOperationGoldHoldingGrams!.Value, t.CreatedAtUtc);
 
     // ── Private helpers ────────────────────────────────────────────────────
 

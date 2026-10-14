@@ -18,4 +18,11 @@ public sealed class GoldHolding
     public uint ConcurrencyToken { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime? UpdatedAtUtc { get; private set; }
+
+    public void ApplyPurchase(decimal quantityGrams, DateTime updatedAtUtc)
+    {
+        if (quantityGrams <= 0m) throw new ArgumentOutOfRangeException(nameof(quantityGrams));
+        QuantityGrams += quantityGrams;
+        UpdatedAtUtc = updatedAtUtc;
+    }
 }

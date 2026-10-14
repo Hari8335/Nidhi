@@ -80,4 +80,26 @@ public sealed class CustomerController(IWalletService walletService) : Controlle
             { StatusCode = failure.Status, ContentTypes = { "application/problem+json" } };
         }
     }
+
+    [HttpGet("gold-price")]
+    [ProducesResponseType<GoldPriceResponse>(200)]
+    public async Task<ActionResult<GoldPriceResponse>> GoldPrice(CancellationToken ct)
+    {
+        try { return await walletService.GetGoldPriceAsync(ct); }
+        catch (WalletFailure failure)
+        {
+            return new ObjectResult(AuthProblems.Create(HttpContext, failure.Status, failure.Code, failure.Message))
+            { StatusCode = failure.Status, ContentTypes = { "application/problem+json" } };
+        }
+    }
+
+    [HttpPost("gold-purchases")]
+    [Authorize(Policy = AuthPolicies.VerifiedCustomer)]
+    public async Task<IActionResult> PurchaseGold([FromBody] GoldPurchaseRequest request, CancellationToken ct)
+    {
+        var key = Request.Headers["Idempotency-Key"].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(key) || key.Length > 128) return new ObjectResult(AuthProblems.Create(HttpContext, 400, "VALIDATION_ERROR", "A valid Idempotency-Key header is required.")) { StatusCode = 400, ContentTypes = { "application/problem+json" } };
+        try { var result = await walletService.PurchaseGoldAsync(User, request, key, ct); return result.IsReplay ? Ok(result.Receipt) : StatusCode(201, result.Receipt); }
+        catch (WalletFailure f) { return new ObjectResult(AuthProblems.Create(HttpContext, f.Status, f.Code, f.Message)) { StatusCode = f.Status, ContentTypes = { "application/problem+json" } }; }
+    }
 }
