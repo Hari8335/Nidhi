@@ -13,6 +13,11 @@ const messages: Record<string, string> = {
   CSRF_VALIDATION_FAILED: "Your security check expired. Please try again.",
   RATE_LIMITED: "Too many requests. Please wait before trying again.",
   IDENTITY_EMAIL_UNAVAILABLE: "We could not send your verification message. Please try registering again later.",
+  INVALID_FUNDING_AMOUNT: "Funding amount must be between LKR 100.00 and LKR 1,000,000.00.",
+  DAILY_FUNDING_LIMIT_EXCEEDED: "You have reached your daily funding limit of 20 operations today.",
+  WALLET_LIMIT_EXCEEDED: "This funding would cause your wallet balance to exceed the maximum cap of LKR 5,000,000.00.",
+  IDEMPOTENCY_CONFLICT: "This idempotency key was previously submitted with different details.",
+  OPERATION_IN_PROGRESS: "A funding request is already in progress. Please retry in a few moments.",
 };
 export function parseProblem(value: unknown): ProblemDetails {
   if (!value || typeof value !== "object") return {};
@@ -32,7 +37,7 @@ export class ApiError extends Error {
   problem: ProblemDetails;
   constructor(status: number, problem: ProblemDetails = {}, retryAfter: string | null = null) {
     const seconds = retryAfter && /^\d+$/.test(retryAfter) ? Number(retryAfter) : null;
-    super((status >= 500 && problem.code !== "IDENTITY_EMAIL_UNAVAILABLE" ? undefined : messages[problem.code ?? ""]) ?? (status === 0 ? "We could not connect. Check your connection and try again." : "We could not complete your request. Please try again later."));
+    super((status >= 500 && problem.code !== "IDENTITY_EMAIL_UNAVAILABLE" ? undefined : (messages[problem.code ?? ""] ?? problem.detail ?? problem.title)) ?? (status === 0 ? "We could not connect. Check your connection and try again." : "We could not complete your request. Please try again later."));
     if (status === 429 && seconds) this.message += ` Try again in ${seconds} seconds.`;
     this.status = status;
     this.problem = problem;
@@ -69,10 +74,18 @@ export function createApiClient(base = apiBase, fetcher: typeof fetch = (...args
     }).catch(error => { clearCsrf(); throw error; });
     return csrf;
   }
-  async function post<T>(path: string, body?: unknown): Promise<T> {
+  async function post<T>(path: string, body?: unknown, headers?: Record<string, string>): Promise<T> {
     for (let attempt = 0; ; attempt++) {
       try {
-        const result = await request<T>(path, { method: "POST", headers: { "Content-Type": "application/json", "X-CSRF-TOKEN": await token() }, body: body === undefined ? undefined : JSON.stringify(body) });
+        const result = await request<T>(path, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-TOKEN": await token(),
+            ...headers,
+          },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
         if (["/auth/login", "/auth/logout", "/auth/reset-password"].includes(path)) clearCsrf();
         return result;
       } catch (error) {

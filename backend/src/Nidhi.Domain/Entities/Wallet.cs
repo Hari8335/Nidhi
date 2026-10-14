@@ -18,4 +18,15 @@ public sealed class Wallet
     public uint ConcurrencyToken { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime? UpdatedAtUtc { get; private set; }
+
+    /// <summary>
+    /// Applies a validated funding amount. Must be called inside a database transaction
+    /// that holds a FOR UPDATE lock on this row. Caller is responsible for ensuring
+    /// all business rules (min/max/cap/daily limit) are satisfied before calling this.
+    /// </summary>
+    public void ApplyFunding(decimal amount, DateTime updatedAtUtc)
+    {
+        BalanceLkr += amount;
+        UpdatedAtUtc = updatedAtUtc;
+    }
 }
