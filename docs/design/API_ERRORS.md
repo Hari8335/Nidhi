@@ -155,3 +155,7 @@ When a customer attempts to save gold using a price that has been superseded:
 }
 ```
 The client UI uses the `activePrice` object to prompt the customer with the new price quote and ask for explicit reconfirmation with a new idempotency key.
+
+## Session 9 financial reads
+
+Holdings, history and receipt GETs require `AuthPolicies.VerifiedCustomer`: anonymous → 401 `AUTHENTICATION_REQUIRED`; unverified CUSTOMER → 403 `EMAIL_NOT_VERIFIED`; ADMIN without CUSTOMER → 403 `FORBIDDEN`. Invalid/unparseable `page` or `pageSize` → 400 `VALIDATION_ERROR`. An unknown or foreign-owned receipt → identical 404 `RESOURCE_NOT_FOUND` / "Transaction not found.". Missing or stale prices do not fail holdings: quantity is retained and valuation is null per [API_CONTRACT.md](API_CONTRACT.md#48-get-apiv1customerholdings). No new error code or transaction status is introduced.

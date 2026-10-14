@@ -175,7 +175,9 @@ export function WalletView() {
               </dl>
             </Card>
           </div>
-
+        </>
+      ) : null}
+      {wallet && (
           <WalletFundingModal
             isOpen={fundingModalOpen}
             onClose={() => setFundingModalOpen(false)}
@@ -184,8 +186,7 @@ export function WalletView() {
             walletSummary={wallet}
             isEmailVerified={user.isEmailVerified}
           />
-        </>
-      ) : null}
+      )}
     </div>
   );
 }

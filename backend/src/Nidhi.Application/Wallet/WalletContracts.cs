@@ -39,6 +39,8 @@ public sealed record TransactionSummary(
     string Type,
     decimal AmountLkr,
     decimal? GoldQuantityGrams,
+    decimal? AppliedPricePerGramLkr,
+    string Status,
     decimal PostOperationWalletBalanceLkr,
     DateTime CreatedAtUtc);
 

@@ -2643,3 +2643,32 @@ nav small {
     scroll-behavior: auto !important;
   }
 }
+
+/* Customer history and immutable receipts */
+.history-list { list-style: none; padding: 0; margin: 1.25rem 0; display: grid; gap: .75rem; }
+.history-list li { min-width: 0; }
+.history-row { display: flex; justify-content: space-between; gap: 1.25rem; padding: 1.25rem; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); text-decoration: none; }
+.history-row > div { min-width: 0; display: grid; gap: .4rem; }
+.history-row time, .history-row span { color: var(--muted-foreground); font-size: .875rem; }
+.history-reference { overflow-wrap: anywhere; font-family: monospace; }
+.history-amount { text-align: right; flex-shrink: 0; }
+.history-pagination { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1rem; }
+.receipt-fields { display: grid; gap: 1rem; }
+.receipt-fields > div { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.5fr); gap: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem; }
+.receipt-fields dt { color: var(--muted-foreground); }
+.receipt-fields dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+@media (max-width: 600px) { .history-row { flex-direction: column; } .history-amount { text-align: left; } .receipt-fields > div { grid-template-columns: minmax(0,1fr); gap: .4rem; } }
+.holdings-summary { min-width: 0; margin-bottom: 2rem; }
+.holding-quantity { font-size: clamp(1.5rem, 4vw, 2.5rem); font-weight: 650; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+.history-row:hover { border-color: var(--gold); }
+/* Exact eight-place balances must fit the compact dashboard as well. */
+.hero-metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.metric-box, .metric-value-row { min-width: 0; }
+.metric-value-row { flex-wrap: wrap; }
+.metric-large-number { overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .hero-metrics-grid { grid-template-columns: minmax(0, 1fr); }
+  .dashboard-hero-card { padding: 20px; }
+  .metric-box { padding: 16px; }
+}
