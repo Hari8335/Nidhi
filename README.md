@@ -10,19 +10,19 @@ Financial activity is initially simulated. This foundation accepts no real money
 - Backend: C#, .NET 10, ASP.NET Core controllers, REST and OpenAPI; a modular monolith.
 - Tests: xUnit unit tests and ASP.NET Core integration tests.
 - Persistence: PostgreSQL 18 in Docker Compose, EF Core 10, Npgsql 10, and ASP.NET Core Identity storage.
-- Planned: frontend tests, selected Playwright flows, and GitHub Actions.
+- Tests: focused frontend checks with Node’s built-in test runner. CI/CD remains future work.
 
-Persistence storage is implemented. Authentication flows, product use cases, and CI/CD remain future work.
+Persistence and backend Identity authentication are implemented. Session 6 adds frontend authentication and customer/admin shells. Financial use cases and CI/CD remain future work.
 
 ## Structure
 
 ```text
-frontend/web/                 Next.js app (minimal foundation page)
+frontend/web/                 Next.js public/auth pages and customer/admin shells
 backend/
   Nidhi.sln
   src/
     Nidhi.Api/               HTTP controllers and composition
-    Nidhi.Application/       Future application logic
+    Nidhi.Application/       Authentication contracts and application interfaces
     Nidhi.Domain/            Domain entities; no project dependencies
     Nidhi.Infrastructure/    Identity and EF Core persistence
   tests/
@@ -32,7 +32,7 @@ docs/                        Product, architecture and requirements documents
 AGENTS.md                    Current engineering rules
 ```
 
-References: Application → Domain; Infrastructure → Application → Domain; Api → Application and Infrastructure. Application use cases remain unimplemented. Business logic and authorization belong in ASP.NET Core, not Next.js routes or controllers.
+References: Application → Domain; Infrastructure → Application → Domain; Api → Application and Infrastructure. Financial application use cases remain unimplemented. Business logic and authorization belong in ASP.NET Core, not Next.js routes or controllers.
 
 ## Prerequisites
 
@@ -58,7 +58,7 @@ The development launch profile serves http://localhost:5050:
 - `GET /health` returns `{"status":"ok"}` (process liveness only).
 - `GET /openapi/v1.json` exposes the API description in Development only.
 
-Health and OpenAPI require no database. For persistence, follow the [local database setup](docs/DEVELOPMENT_DATABASE.md). ASP.NET Core does not automatically load `.env`. There is no frontend/API data integration yet.
+Health and OpenAPI require no database. For persistence, follow the [local database setup](docs/DEVELOPMENT_DATABASE.md). ASP.NET Core does not automatically load `.env`. For browser authentication, start the API with private development email pickup configured, then run `API_BASE_URL=http://localhost:5050 pnpm dev:web`. The frontend uses a same-origin `/api` rewrite. See [frontend setup](frontend/web/README.md) and [authentication development](docs/DEVELOPMENT_AUTHENTICATION.md).
 
 ## Validate
 
