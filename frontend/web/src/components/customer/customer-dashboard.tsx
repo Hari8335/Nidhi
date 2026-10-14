@@ -7,6 +7,8 @@ import { Alert, Button, Card, LoadingState, StatusBadge } from "@/components/ui/
 import { WalletFundingModal } from "@/components/wallet/wallet-funding-modal";
 import { api, ApiError } from "@/lib/api/client";
 import { formatLkr } from "@/lib/validation/wallet";
+import { GoalCard } from "@/components/goals/goal-card";
+import { parseGoalJson } from "@/lib/goals/presentation";
 import { TransactionList } from "@/components/transactions/transaction-list";
 import type { DashboardData } from "@/types/wallet";
 
@@ -21,7 +23,7 @@ export function CustomerDashboard() {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get<DashboardData>("/customer/dashboard");
+      const res = await api.get<DashboardData>("/customer/dashboard", parseGoalJson<DashboardData>);
       setData(res);
     } catch (err) {
       if (err instanceof ApiError) {
@@ -128,6 +130,7 @@ export function CustomerDashboard() {
             </div>
           </section>
 
+          <GoalCard goal={data.activeGoal} compact />
           {/* Recent Transactions Section */}
           <section className="transactions-section">
             <div className="section-header">

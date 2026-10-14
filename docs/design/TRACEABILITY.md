@@ -144,3 +144,7 @@ In compliance with `AGENTS.md` and the pair programming development discipline, 
 ## Session 9 implementation evidence
 
 FR-HOLDING-001 is implemented through `/customer/holdings` using persisted `GoldHolding` and usable current `GoldPrice`, displayed on `/gold` with wallet from `/customer/wallet`. FR-TRANSACTION-001 and FR-TRANSACTION-002 are implemented through owned, verified-CUSTOMER history/detail queries and `/transactions` / `/transactions/[id]`. FR-GOLD-003 receipt views use immutable price/version/quantity/balance snapshots. FR-HOLDING-002 recent activity shares the same projection and deterministic order; savings goals remain outside Session 9. Pagination, nullable valuation, receipt field shapes and authorization exceptions are reconciled in [API_CONTRACT.md](API_CONTRACT.md). See [SESSION_9_REPORT.md](../SESSION_9_REPORT.md) and `CustomerReadTests` for PostgreSQL ownership, historical-price, holdings-consistency and pagination evidence.
+
+## Session 10 implementation
+
+FR-GOAL-001/002 and US-GOAL-001/002 use the existing SavingsGoal and partial unique active-customer index, verified-CUSTOMER GET/POST `/customer/savings-goal`, `/goals`, and the Dashboard goal card. PostgreSQL `SavingsGoalTests` cover concurrent creation, ownership, exact persistence, no financial mutation and actual Session 8 purchase progress; `GoalProgressTests` exercise decimal completion and visual capping. No edit/delete/replacement is in approved v1 scope. See [SESSION_10_REPORT.md](../SESSION_10_REPORT.md).

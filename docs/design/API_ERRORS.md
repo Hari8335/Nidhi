@@ -58,7 +58,7 @@ To eliminate ambiguity across client implementations and automated testing, Nidh
 | `400 Bad Request` | `INVALID_TOKEN` | Password reset or email verification token is invalid, expired, wrong-account, or already used. Missing/oversized token fields instead fail request validation with `VALIDATION_ERROR`. |
 | `404 Not Found` | `RESOURCE_NOT_FOUND` | Requested entity (e.g., customer, transaction) does not exist or caller does not own it. |
 | `409 Conflict` | `EMAIL_ALREADY_EXISTS` | Registration attempt with an email that is already registered. |
-| `409 Conflict` | `ACTIVE_GOAL_ALREADY_EXISTS`| Attempt to create an active goal when an active goal already exists (and replace was not specified). |
+| `409 Conflict` | `ACTIVE_GOAL_ALREADY_EXISTS`| Attempt to create an active goal when one already exists, including concurrent creation; replacement is not supported in v1. |
 
 ---
 
@@ -159,3 +159,5 @@ The client UI uses the `activePrice` object to prompt the customer with the new 
 ## Session 9 financial reads
 
 Holdings, history and receipt GETs require `AuthPolicies.VerifiedCustomer`: anonymous → 401 `AUTHENTICATION_REQUIRED`; unverified CUSTOMER → 403 `EMAIL_NOT_VERIFIED`; ADMIN without CUSTOMER → 403 `FORBIDDEN`. Invalid/unparseable `page` or `pageSize` → 400 `VALIDATION_ERROR`. An unknown or foreign-owned receipt → identical 404 `RESOURCE_NOT_FOUND` / "Transaction not found.". Missing or stale prices do not fail holdings: quantity is retained and valuation is null per [API_CONTRACT.md](API_CONTRACT.md#48-get-apiv1customerholdings). No new error code or transaction status is introduced.
+
+Session 10: `503 HOLDING_UNAVAILABLE` means a required persisted GoldHolding is missing; goal progress is unavailable, never a fabricated zero. Goal target/date validation uses `400 VALIDATION_ERROR`.

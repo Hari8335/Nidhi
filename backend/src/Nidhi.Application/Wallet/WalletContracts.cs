@@ -48,7 +48,8 @@ public sealed record TransactionSummary(
 public sealed record DashboardResponse(
     decimal WalletBalanceLkr,
     decimal GoldHoldingGrams,
-    IReadOnlyList<TransactionSummary> RecentTransactions);
+    IReadOnlyList<TransactionSummary> RecentTransactions,
+    Nidhi.Application.SavingsGoals.GoalResponse? ActiveGoal = null);
 
 public sealed record GoldPurchaseRequest([Required] decimal AmountLkr, [Required] Guid PriceVersionId);
 public sealed record GoldPriceResponse(Guid PriceVersionId, decimal PricePerGramLkr, DateTime PublishedAtUtc, bool IsFresh, bool IsPurchasingEnabled);
