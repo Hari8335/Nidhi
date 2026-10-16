@@ -21,6 +21,8 @@ public sealed record LoginRequest(
     [Required, EmailAddress, StringLength(256)] string Email,
     [Required, StringLength(128)] string Password);
 public sealed record ForgotPasswordRequest([Required, EmailAddress, StringLength(256)] string Email);
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record ResendVerificationRequest([Required, EmailAddress, StringLength(256)] string Email);
 public sealed record VerifyEmailRequest(Guid UserId, [Required, StringLength(4096)] string Token);
 public sealed record ResetPasswordRequest(Guid UserId,
     [Required, StringLength(4096)] string Token,
@@ -43,6 +45,7 @@ public interface IAuthService
 {
     Task<RegistrationResponse> RegisterAsync(RegisterRequest request);
     Task VerifyEmailAsync(VerifyEmailRequest request);
+    Task ResendVerificationAsync(ResendVerificationRequest request);
     Task<LoginResponse> LoginAsync(LoginRequest request);
     Task LogoutAsync(ClaimsPrincipal principal);
     Task<CurrentUserResponse> CurrentUserAsync(ClaimsPrincipal principal);

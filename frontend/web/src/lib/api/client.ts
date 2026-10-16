@@ -8,6 +8,7 @@ const messages: Record<string, string> = {
   FORBIDDEN: "You do not have access to this area.",
   EMAIL_NOT_VERIFIED: "Verify your email before continuing.",
   EMAIL_ALREADY_EXISTS: "This email is already registered. Sign in or reset your password.",
+  EMAIL_VERIFICATION_REQUIRED: "This email is awaiting verification. Continue verification or request a new email. Your original password is unchanged.",
   INVALID_TOKEN: "This verification or reset code is invalid, expired, or already used.",
   VALIDATION_ERROR: "Please check the highlighted fields and try again.",
   CSRF_VALIDATION_FAILED: "Your security check expired. Please try again.",

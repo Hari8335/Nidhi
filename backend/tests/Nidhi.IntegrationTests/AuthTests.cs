@@ -76,10 +76,12 @@ public sealed class AuthPostgresFixture : IAsyncLifetime
             builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:NidhiDb"] = ConnectionString,
+                ["IdentityEmail:Provider"] = "Pickup",
                 ["Auth:RateLimits:register:PermitLimit"] = limit.ToString(),
                 ["Auth:RateLimits:login:PermitLimit"] = limit.ToString(),
                 ["Auth:RateLimits:forgot-password:PermitLimit"] = limit.ToString(),
                 ["Auth:RateLimits:tokens:PermitLimit"] = limit.ToString(),
+                ["Auth:RateLimits:resend-verification:PermitLimit"] = limit.ToString(),
                 ["Logging:LogLevel:Default"] = "Warning"
             }));
             builder.ConfigureServices(services =>
@@ -155,10 +157,65 @@ public sealed class AuthTests(AuthPostgresFixture fixture) : IClassFixture<AuthP
         Assert.False(await db.FinancialTransactions.AnyAsync());
         Assert.False(await db.GoldPrices.AnyAsync());
         Assert.Equal(new[] { "ADMIN", "CUSTOMER" }, await db.Roles.OrderBy(x => x.Name).Select(x => x.Name).ToArrayAsync());
-        await Error(await Post(client, "register", new RegisterRequest(account.Email.ToUpperInvariant(), Password())), HttpStatusCode.Conflict, "EMAIL_ALREADY_EXISTS");
+        await Error(await Post(client, "register", new RegisterRequest(account.Email.ToUpperInvariant(), Password())), HttpStatusCode.Conflict, "EMAIL_VERIFICATION_REQUIRED");
         var forbiddenEmail = NewEmail();
         await Error(await Post(client, "register", new { email = forbiddenEmail, password = Password(), role = "ADMIN" }), HttpStatusCode.BadRequest, "VALIDATION_ERROR");
         Assert.Null(await users.FindByEmailAsync(forbiddenEmail));
+    }
+
+    [PostgresFact]
+    public async Task Pending_signup_can_resend_without_replacing_credentials_or_balances()
+    {
+        using var client = fixture.Factory.CreateClient();
+        var account = await Register(client);
+        var changedPassword = Password();
+        await Error(await Post(client, "register", new RegisterRequest(account.Email, changedPassword, "Replacement")),
+            HttpStatusCode.Conflict, "EMAIL_VERIFICATION_REQUIRED");
+        await Error(await Post(client, "resend-verification", new ResendVerificationRequest(account.Email), false),
+            HttpStatusCode.BadRequest, "CSRF_VALIDATION_FAILED");
+        await Error(await Post(client, "resend-verification", new { email = account.Email, role = "ADMIN" }),
+            HttpStatusCode.BadRequest, "VALIDATION_ERROR");
+        var before = fixture.Emails.Messages.Count;
+        var resent = await Post(client, "resend-verification", new ResendVerificationRequest(account.Email.ToUpperInvariant()));
+        Assert.Equal(HttpStatusCode.OK, resent.StatusCode);
+        var body = await resent.Content.ReadAsStringAsync();
+        Assert.Equal(before + 1, fixture.Emails.Messages.Count);
+        var verification = fixture.Emails.Messages.Last(x => x.Email == account.Email && x.Purpose == "verification");
+        Assert.DoesNotContain(verification.Token, body);
+        Assert.Equal(body, await (await Post(client, "resend-verification", new ResendVerificationRequest(NewEmail()))).Content.ReadAsStringAsync());
+        fixture.Emails.Fail = true;
+        try
+        {
+            Assert.Equal(body, await (await Post(client, "resend-verification", new ResendVerificationRequest(account.Email))).Content.ReadAsStringAsync());
+        }
+        finally { fixture.Emails.Fail = false; }
+        using (var scope = fixture.Factory.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var user = (await users.FindByIdAsync(account.UserId.ToString()))!;
+            Assert.True(await users.CheckPasswordAsync(user, account.Password));
+            Assert.False(await users.CheckPasswordAsync(user, changedPassword));
+            var db = scope.ServiceProvider.GetRequiredService<NidhiDbContext>();
+            Assert.Equal("Test customer", (await db.CustomerProfiles.FindAsync(account.UserId))!.DisplayName);
+            Assert.Single(await db.Wallets.Where(x => x.CustomerId == account.UserId).ToListAsync());
+            Assert.Equal(0m, (await db.Wallets.SingleAsync(x => x.CustomerId == account.UserId)).BalanceLkr);
+        }
+        Assert.Equal(HttpStatusCode.OK, (await Post(client, "verify-email", new VerifyEmailRequest(account.UserId, verification.Token))).StatusCode);
+        await Error(await Post(client, "verify-email", new VerifyEmailRequest(account.UserId, verification.Token)), HttpStatusCode.BadRequest, "INVALID_TOKEN");
+        before = fixture.Emails.Messages.Count;
+        Assert.Equal(body, await (await Post(client, "resend-verification", new ResendVerificationRequest(account.Email))).Content.ReadAsStringAsync());
+        Assert.Equal(before, fixture.Emails.Messages.Count);
+        await Error(await Post(client, "register", new RegisterRequest(account.Email, changedPassword)), HttpStatusCode.Conflict, "EMAIL_ALREADY_EXISTS");
+    }
+
+    [PostgresFact]
+    public async Task Resend_verification_is_rate_limited()
+    {
+        using var factory = fixture.NewFactory(limit: 1);
+        using var client = factory.CreateClient();
+        var email = NewEmail();
+        Assert.Equal(HttpStatusCode.OK, (await Post(client, "resend-verification", new ResendVerificationRequest(email))).StatusCode);
+        await Error(await Post(client, "resend-verification", new ResendVerificationRequest(email)), HttpStatusCode.TooManyRequests, "RATE_LIMITED");
     }
 
     [PostgresFact]
@@ -313,7 +370,7 @@ public sealed class AuthTests(AuthPostgresFixture fixture) : IClassFixture<AuthP
         using var development = fixture.Factory.CreateClient();
         var json = await development.GetFromJsonAsync<JsonElement>("/openapi/v1.json");
         var paths = json.GetProperty("paths");
-        Assert.Equal(8, paths.EnumerateObject().Count(x => x.Name.StartsWith("/api/v1/auth/")));
+        Assert.Equal(9, paths.EnumerateObject().Count(x => x.Name.StartsWith("/api/v1/auth/")));
         Assert.Equal("cookie", json.GetProperty("components").GetProperty("securitySchemes").GetProperty("IdentityCookie").GetProperty("in").GetString());
         Assert.Contains(paths.GetProperty("/api/v1/auth/login").GetProperty("post").GetProperty("parameters").EnumerateArray(), x => x.GetProperty("name").GetString() == "X-CSRF-TOKEN" && x.GetProperty("required").GetBoolean());
         Assert.True(paths.GetProperty("/api/v1/auth/me").GetProperty("get").TryGetProperty("security", out _));

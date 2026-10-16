@@ -65,7 +65,22 @@ public static class AuthConfiguration
         services.AddScoped<IAuthorizationHandler, VerifiedEmailHandler>();
         services.AddSingleton<IAuthorizationMiddlewareResultHandler, AuthAuthorizationResultHandler>();
         services.AddScoped<IAuthService, AuthService>();
-        services.AddScoped<IIdentityEmailSender, LocalIdentityEmailSender>();
+        var emailProvider = builder.Configuration["IdentityEmail:Provider"] ?? "Pickup";
+        if (emailProvider.Equals("Gmail", StringComparison.OrdinalIgnoreCase))
+        {
+            var checkRevocation = builder.Configuration.GetValue<bool?>("IdentityEmail:Gmail:CheckCertificateRevocation") ?? true;
+            if (!checkRevocation && !builder.Environment.IsDevelopment())
+                throw new InvalidOperationException("Disabling Gmail certificate revocation checks is restricted to Development.");
+            services.AddScoped<MailKit.Net.Smtp.ISmtpClient>(_ => new MailKit.Net.Smtp.SmtpClient
+            {
+                CheckCertificateRevocation = checkRevocation
+            });
+            services.AddScoped<IIdentityEmailSender, GmailIdentityEmailSender>();
+        }
+        else if (emailProvider.Equals("Pickup", StringComparison.OrdinalIgnoreCase))
+            services.AddScoped<IIdentityEmailSender, LocalIdentityEmailSender>();
+        else
+            throw new InvalidOperationException("IdentityEmail:Provider must be Pickup or Gmail.");
         services.AddScoped<AdminProvisioner>();
         services.PostConfigure<ApiBehaviorOptions>(options => options.InvalidModelStateResponseFactory = ctx =>
         {
@@ -83,7 +98,7 @@ public static class AuthConfiguration
                     ctx.HttpContext.Response.Headers.RetryAfter = Math.Ceiling(retry.TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
                 await AuthProblems.WriteAsync(ctx.HttpContext, 429, "RATE_LIMITED", "Too many requests. Please retry later.");
             };
-            foreach (var (name, defaultLimit) in new[] { ("register", 5), ("login", 10), ("forgot-password", 5), ("tokens", 20) })
+            foreach (var (name, defaultLimit) in new[] { ("register", 5), ("login", 10), ("forgot-password", 5), ("resend-verification", 5), ("tokens", 20) })
             {
                 var limit = builder.Configuration.GetValue<int?>($"Auth:RateLimits:{name}:PermitLimit") ?? defaultLimit;
                 var seconds = builder.Configuration.GetValue<int?>($"Auth:RateLimits:{name}:WindowSeconds") ?? 60;

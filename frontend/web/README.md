@@ -18,13 +18,15 @@ Manrope is loaded and self-hosted through `next/font/google`. Development/produc
 ## Authentication pages
 
 - `/register`: email, password, optional display name; success links to verification.
-- `/verify-email`: enter `userId` and `token` from the private verification pickup JSON. The code is masked and never placed in a URL or persisted in browser storage.
+- `/verify-email`: open the emailed Verify email link and confirm. Without a link, enter your email to request another verification message. No account ID or token fields are shown.
 - `/login`: routes the actual CUSTOMER to `/dashboard` and ADMIN to `/admin`.
 - `/forgot-password`: always shows a generic recovery result.
-- `/reset-password`: enter the reset pickup `userId`/`token`, new password, and confirmation, then sign in again.
+- `/reset-password`: open the emailed Reset password link, choose a new password, and confirm it. Legacy private pickup `userId`/`token` entry remains available when no link is supplied.
 - `/profile`: read-only safe current-user details from `/auth/me`; no planned profile business endpoint is called.
 
-Pickup files are development credentials. Read them privately, never serve or commit them, and delete them after testing. The backend has no resend-verification endpoint; already-confirmed/expired/used codes return the documented generic invalid-token result. This session does not introduce emailed URLs or a production email provider.
+Pickup files are development credentials. Read them privately, never serve or commit them, and delete them after testing. Set `IdentityEmail:PublicBaseUrl` to the trusted frontend origin to include a `link` in pickup JSON. Gmail sends styled action buttons with the same links. Credentials travel in a URL fragment, are removed from the address bar after loading, and remain only in memory; opening a link never submits verification automatically. Expired or used links can be replaced using `POST /api/v1/auth/resend-verification` from the verification page. The UI has a 60-second resend cooldown and the API independently rate-limits requests. Repeat signup for an unverified email offers verification without replacing the original password.
+
+`tests/email-verification-browser.mjs` checks verification/resend and reset-link UI with intercepted responses, without creating accounts or sending mail. Supply `NIDHI_PLAYWRIGHT_MODULE` and optionally `NIDHI_CHROME_PATH` for an existing external Playwright/Chrome installation, then run it from the repository root with Node.
 
 ## Foundation
 

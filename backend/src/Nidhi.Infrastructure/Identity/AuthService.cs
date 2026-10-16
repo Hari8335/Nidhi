@@ -17,7 +17,9 @@ public sealed class AuthService(NidhiDbContext db, UserManager<ApplicationUser> 
         await using var transaction = await db.Database.BeginTransactionAsync();
         try
         {
-            if (await users.FindByEmailAsync(request.Email) is not null) throw DuplicateEmail();
+            if (await users.FindByEmailAsync(request.Email) is { } existing)
+                throw existing.EmailConfirmed ? DuplicateEmail() : new AuthFailure("EMAIL_VERIFICATION_REQUIRED", 409,
+                    "This email is awaiting verification. Continue verification or request a new email. Your original password is unchanged.");
             await IdentityRoles.EnsureAsync(db);
             var user = new ApplicationUser { UserName = request.Email, Email = request.Email };
             Check(await users.CreateAsync(user, request.Password));
@@ -45,6 +47,21 @@ public sealed class AuthService(NidhiDbContext db, UserManager<ApplicationUser> 
         if (user is null || user.EmailConfirmed) throw InvalidToken();
         var result = await users.ConfirmEmailAsync(user, request.Token);
         if (!result.Succeeded) throw InvalidToken();
+    }
+
+    public async Task ResendVerificationAsync(ResendVerificationRequest request)
+    {
+        var user = await users.FindByEmailAsync(request.Email);
+        if (user is null || user.EmailConfirmed) return;
+        try
+        {
+            await email.SendVerificationAsync(user.Id, user.Email!, await users.GenerateEmailConfirmationTokenAsync(user));
+        }
+        catch (Exception)
+        {
+            // Keep known, unknown, confirmed and delivery-failure responses identical.
+            logger.LogWarning("Identity verification delivery failed.");
+        }
     }
 
     public async Task<LoginResponse> LoginAsync(LoginRequest request)

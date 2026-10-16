@@ -1,13 +1,16 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Brand } from "@/components/shared/brand";
 import { Card } from "@/components/ui/primitives";
 import { AuthSavingsMark } from "@/components/shared/gold-savings-visual";
 
+export const metadata: Metadata = { robots: { index: false, follow: false } };
+
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="auth-split-layout">
       {/* Left Column: Branded Showcase (Desktop) */}
-      <aside className="auth-showcase-pane" aria-hidden="true">
+      <aside className="auth-showcase-pane">
         <div className="auth-showcase-content">
           <div className="auth-brand-header">
             <Brand />

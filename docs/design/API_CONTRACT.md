@@ -32,7 +32,7 @@ This document specifies the versioned REST API surface (`/api/v1/...`) for Nidhi
 
 | Group | Endpoint Count | Purpose |
 |---|---|---|
-| **Public / Authentication** | 9 | Visitor landing disclosures, registration, login, logout, verification, password recovery, antiforgery token, current user. |
+| **Public / Authentication** | 10 | Visitor landing disclosures, registration, login, logout, verification, password recovery, antiforgery token, current user. |
 | **Customer** | 12 | Dashboard, profile, wallet, funding, price, gold saving, holdings, transactions, savings goal. |
 | **Administrator** | 9 | Operational dashboard, customer inspection, transaction/ledger review, price publication, audit trail. |
 | **Total** | **30** | Complete v1 capability set without speculative endpoints. |
@@ -67,7 +67,7 @@ The contract contains 8 implemented authentication endpoints plus 1 planned publ
     }
     ```
   - `400 Bad Request`: `VALIDATION_ERROR` (invalid email format, weak password, displayName > 100 chars).
-  - `409 Conflict`: `EMAIL_ALREADY_EXISTS` (normalized email already registered).
+  - `409 Conflict`: `EMAIL_ALREADY_EXISTS` for a verified account; `EMAIL_VERIFICATION_REQUIRED` for a pending unverified account. Repeated signup never replaces the existing password, profile, or balances. The frontend offers verification/resend for a pending account.
 
 ---
 
@@ -86,6 +86,14 @@ The contract contains 8 implemented authentication endpoints plus 1 planned publ
   - `400 Bad Request`: `VALIDATION_ERROR` or `INVALID_TOKEN` (token expired, reused, or invalid).
 
 ---
+
+### 3.2a. `POST /api/v1/auth/resend-verification`
+
+- **Authentication**: Anonymous; paired antiforgery cookie and `X-CSRF-TOKEN` required.
+- **Request**: `{ "email": "customer@example.com" }`; unsupported fields are rejected.
+- **Response**: Generic `200 OK` with `message` for pending, verified, unknown addresses, and delivery failures. Only pending accounts receive a fresh one-hour verification link. No user IDs or tokens are returned.
+- **Errors**: `400 VALIDATION_ERROR` / `CSRF_VALIDATION_FAILED`; `429 RATE_LIMITED` with `Retry-After`. Default limit: five requests per remote IP per 60 seconds.
+- Resend never changes passwords, profiles, sessions, or balances. Prior unexpired verification links remain valid until confirmation succeeds; successful confirmation rejects subsequent use. Email links carry credentials in a URL fragment and require an explicit CSRF-protected POST to confirm.
 
 ### 3.3. `POST /api/v1/auth/login`
 - **Description**: Authenticates a user (Customer or Admin) and issues a secure `HttpOnly` session cookie (OD-018).
