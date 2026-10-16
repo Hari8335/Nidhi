@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { formatDateTime } from "@/lib/format/date";
 import { Alert, Button, Card, FormField, Input, StatusBadge } from "@/components/ui/primitives";
 import { api, ApiError } from "@/lib/api/client";
 import { formatLkr, validateFundingInput, WALLET_LIMITS } from "@/lib/validation/wallet";
@@ -33,6 +34,18 @@ export function WalletFundingModal({
   const [receipt, setReceipt] = useState<FundingReceipt | null>(null);
   const [canRetrySameKey, setCanRetrySameKey] = useState(false);
 
+  const dialog = useRef<HTMLDialogElement>(null);
+  const lock = useRef(false);
+  const resultHeading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (!isOpen) return;
+    const element = dialog.current;
+    const previous = document.activeElement as HTMLElement | null;
+    element?.showModal();
+    return () => { element?.close(); if (previous?.isConnected) previous.focus(); else document.querySelector<HTMLElement>("[data-funding-trigger]")?.focus(); };
+  }, [isOpen]);
+  useEffect(() => { if (receipt) resultHeading.current?.focus(); }, [receipt]);
+
   // Initialize fresh idempotency key when opening the modal
   useEffect(() => {
     if (isOpen) {
@@ -53,6 +66,7 @@ export function WalletFundingModal({
   const projectedBalance = currentBalance + parsedAmount;
 
   async function handleFund(useExistingKey = false) {
+    if (lock.current) return;
     if (!isEmailVerified) {
       setError("Please verify your email address before adding simulated funds.");
       return;
@@ -68,7 +82,7 @@ export function WalletFundingModal({
       setIdempotencyKey(keyToUse);
     }
 
-    setBusy(true);
+    lock.current = true; setBusy(true);
     setError(null);
 
     try {
@@ -92,7 +106,7 @@ export function WalletFundingModal({
         setCanRetrySameKey(true);
       }
     } finally {
-      setBusy(false);
+      lock.current = false; setBusy(false);
     }
   }
 
@@ -104,13 +118,20 @@ export function WalletFundingModal({
   }
 
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="funding-modal-title">
+    <dialog ref={dialog} className="modal-backdrop" aria-labelledby="funding-modal-title" onCancel={e => { if (lock.current) e.preventDefault(); else onClose(); }} onKeyDown={e => {
+      if (e.key !== "Tab") return;
+      const controls = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), a[href]')).filter(el => el.getClientRects().length > 0);
+      const first = controls[0], last = controls[controls.length - 1];
+      if (!first) { e.preventDefault(); return; }
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }}>
       <div className="modal-container">
         <Card className="funding-modal-card">
           <div className="modal-header">
             <div>
               <p className="eyebrow">SIMULATED FUNDING</p>
-              <h2 id="funding-modal-title">
+              <h2 id="funding-modal-title" ref={resultHeading} tabIndex={-1}>
                 {receipt ? "Funds Added Successfully" : "Add Simulated Funds"}
               </h2>
             </div>
@@ -118,6 +139,7 @@ export function WalletFundingModal({
               type="button"
               className="modal-close-button"
               onClick={onClose}
+              disabled={busy}
               aria-label="Close dialog"
             >
               ✕
@@ -168,7 +190,7 @@ export function WalletFundingModal({
                 </div>
                 <div>
                   <dt>Date & Time</dt>
-                  <dd>{new Date(receipt.createdAtUtc).toLocaleString()}</dd>
+                  <dd>{formatDateTime(receipt.createdAtUtc)}</dd>
                 </div>
               </dl>
 
@@ -201,7 +223,7 @@ export function WalletFundingModal({
                   {error}
                   {canRetrySameKey && (
                     <div className="mt-2 text-xs">
-                      The outcome was uncertain. Retrying uses the same idempotency key to prevent double credits.
+                      The outcome is uncertain. Retry this same funding request to recover its receipt safely. Check your transaction history before starting another request.
                     </div>
                   )}
                 </Alert>
@@ -224,7 +246,11 @@ export function WalletFundingModal({
                       if (canRetrySameKey) setCanRetrySameKey(false);
                     }}
                     placeholder="1000.00"
-                    disabled={busy || !isEmailVerified}
+                    disabled={busy || canRetrySameKey || !isEmailVerified}
+                    required
+                    autoComplete="off"
+                    aria-invalid={!!amountInput && !validation.isValid}
+                    aria-describedby={`funding-amount-hint${amountInput && !validation.isValid ? " funding-amount-error" : ""}`}
                     autoFocus
                   />
                 </div>
@@ -242,7 +268,7 @@ export function WalletFundingModal({
                         setAmountInput(String(val));
                         if (canRetrySameKey) setCanRetrySameKey(false);
                       }}
-                      disabled={busy || !isEmailVerified}
+                      disabled={busy || canRetrySameKey || !isEmailVerified}
                     >
                       +{val >= 1000 ? `${val / 1000}k` : val}
                     </button>
@@ -290,6 +316,6 @@ export function WalletFundingModal({
           )}
         </Card>
       </div>
-    </div>
+    </dialog>
   );
 }

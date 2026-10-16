@@ -3,17 +3,18 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { api, ApiError } from "@/lib/api/client";
 import type { CurrentUser } from "@/types/auth";
 
-type Session = { status: "loading" | "anonymous" } | { status: "authenticated"; user: CurrentUser } | { status: "error"; message: string };
-const AuthContext = createContext<{ session: Session; refresh: () => Promise<CurrentUser | null>; clear: () => void } | null>(null);
+type Session = { status: "loading" } | { status: "anonymous"; expired?: boolean } | { status: "authenticated"; user: CurrentUser } | { status: "error"; message: string };
+const AuthContext = createContext<{ session: Session; refresh: () => Promise<CurrentUser | null>; clear: (expired?: boolean) => void } | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session>({ status: "loading" });
   const version = useRef(0);
-  const clear = useCallback(() => { version.current++; api.clearCsrf(); setSession({ status: "anonymous" }); }, []);
+  const hadSession = useRef(false);
+  const clear = useCallback((expired = false) => { const ended = expired && hadSession.current; hadSession.current = false; version.current++; api.clearCsrf(); setSession({ status: "anonymous", expired: ended }); }, []);
   const refresh = useCallback(async () => {
     const requestVersion = ++version.current;
     try {
       const user = await api.get<CurrentUser>("/auth/me");
-      if (requestVersion === version.current) setSession({ status: "authenticated", user });
+      if (requestVersion === version.current) { hadSession.current = true; setSession({ status: "authenticated", user }); }
       return user;
     } catch (error) {
       if (requestVersion === version.current) {
@@ -24,7 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
   useEffect(() => {
-    const expire = () => clear();
+    const expire = () => clear(true);
     const visible = () => { if (document.visibilityState === "visible") void refresh(); };
     const timer = window.setInterval(() => { if (document.visibilityState === "visible") void refresh(); }, 60000);
     window.addEventListener("nidhi:session-expired", expire);

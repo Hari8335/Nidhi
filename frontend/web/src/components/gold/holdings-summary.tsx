@@ -32,10 +32,9 @@ export function HoldingsSummary({ refreshKey }: { refreshKey?: string }) {
   function refresh() { setError(""); setLoading(true); setRetry(x => x + 1); }
   return <section aria-label="Your simulated holdings" className="holdings-summary">
     <h2>Your simulated holding</h2>
-    {loading || loadedKey !== refreshKey ? <LoadingState text="Loading persisted holdings…" /> : error ? <Alert>{error}</Alert> : data && <>
+    {loading || loadedKey !== refreshKey ? <LoadingState text="Loading your holdings…" /> : error ? <Alert>{error}</Alert> : data && <>
       <div className="dashboard-hero-card"><p className="metric-label">Simulated gold</p><p className="holding-quantity">{formatGoldGrams(data.holding.quantityGrams)} g</p><p>Simulated wallet: {formatLkr(data.wallet.balanceLkr)}</p>
         {data.holding.indicativePortfolioValueLkr !== null ? <><p>Current indicative simulated value: {formatLkr(data.holding.indicativePortfolioValueLkr)}</p><p>At LKR {data.holding.activePricePerGramLkr?.toFixed(4)} / g. This is a current simulation estimate.</p></> : <p>Current indicative value unavailable: {data.holding.activePricePerGramLkr === null ? "no simulated price has been published." : "the simulated price is stale."}</p>}
-        {data.holding.priceVersionId && <p className="break-all">Current price version: {data.holding.priceVersionId}</p>}
       </div>
       <h3>Recent activity</h3><TransactionList items={data.history.items} />
     </>}

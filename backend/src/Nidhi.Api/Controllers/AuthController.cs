@@ -17,7 +17,12 @@ public sealed class AuthController(IAuthService auth, IAntiforgery antiforgery) 
 {
     [HttpGet("antiforgery")]
     [ProducesResponseType<AntiforgeryResponse>(200)]
-    public ActionResult<AntiforgeryResponse> Antiforgery() => new AntiforgeryResponse(antiforgery.GetAndStoreTokens(HttpContext).RequestToken!);
+    public ActionResult<AntiforgeryResponse> Antiforgery()
+    {
+        Response.Headers.CacheControl = "no-cache, no-store";
+        Response.Headers.Pragma = "no-cache";
+        return new AntiforgeryResponse(antiforgery.GetAndStoreTokens(HttpContext).RequestToken!);
+    }
 
     [HttpPost("register"), EnableRateLimiting("register")]
     [ProducesResponseType<RegistrationResponse>(201)]

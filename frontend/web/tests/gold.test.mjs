@@ -45,11 +45,12 @@ test("PRICE_CHANGED abandons A, displays B and new estimate, and requires explic
   assert.deepEqual(h.calls, [{ body: { amountLkr: 100, priceVersionId: "price-a" }, key: "intent-1" }]);
   const state = h.flow.getSnapshot();
   assert.equal(state.price.priceVersionId, "price-b");
+  assert.deepEqual(state.priceChange, { previousPrice: priceA, amountLkr: 100 });
   assert.equal(formatGoldGrams(truncateGoldPreview(100, state.price.pricePerGramLkr)), "0.00250000");
   assert.match(state.error, /explicitly confirm again/);
   assert.equal(state.reconfirm, true); assert.equal(state.reviewing, false); assert.equal(state.receipt, null);
   h.fail(null); await h.flow.submit(); assert.equal(h.calls.length, 1);
-  h.flow.review(100); assert.equal(h.calls.length, 1);
+  h.flow.reviewUpdated(); assert.equal(h.calls.length, 1);
   await h.flow.submit();
   assert.deepEqual(h.calls[1], { body: { amountLkr: 100, priceVersionId: "price-b" }, key: "intent-2" });
   assert.equal(h.flow.getSnapshot().receipt.transactionId, "transaction-server");
@@ -100,4 +101,58 @@ test("manual price refresh invalidates reviewed old version without automatic su
   const h = harness(); await h.flow.refresh(); h.flow.review(100); h.price(priceB); await h.flow.refresh();
   assert.equal(h.flow.getSnapshot().reviewing, false); assert.equal(h.flow.getSnapshot().reconfirm, true);
   await h.flow.submit(); assert.equal(h.calls.length, 0);
+});
+
+test("replacement quote refresh failure preserves Price A and amount without a false current price or balance", async () => {
+  let unavailable = false;
+  let calls = 0;
+  const flow = createPurchaseFlow({
+    async get(path) { if (unavailable) throw new Error("offline"); return path.endsWith("gold-price") ? priceA : { walletBalanceLkr: 1000, goldHoldingGrams: 0.12 }; },
+    async post() { calls++; unavailable = true; throw { problem: { code: "PRICE_CHANGED" } }; },
+  });
+  await flow.refresh(); flow.review(100); await flow.submit();
+  assert.deepEqual(flow.getSnapshot().priceChange, { previousPrice: priceA, amountLkr: 100 });
+  assert.equal(flow.getSnapshot().price, null); assert.equal(flow.getSnapshot().balances, null);
+  flow.reviewUpdated(); await flow.submit(); assert.equal(calls, 1);
+});
+test("repeated refresh cannot erase a rejected quote or bypass explicit new-price review", async () => {
+  const h = harness(); await h.flow.refresh(); h.flow.review(100); h.fail("PRICE_CHANGED"); h.price(priceB); await h.flow.submit();
+  await h.flow.refresh(); await h.flow.refresh();
+  assert.deepEqual(h.flow.getSnapshot().priceChange.previousPrice, priceA);
+  h.flow.review(100); await h.flow.submit(); assert.equal(h.calls.length, 1);
+  h.flow.cancel(); assert.equal(h.flow.getSnapshot().priceChange, null);
+});
+test("double confirmation while a purchase is pending emits one POST", async () => {
+  let finish, posts = 0;
+  const flow = createPurchaseFlow({ async get(path) { return path.endsWith("gold-price") ? priceA : {walletBalanceLkr: 1000, goldHoldingGrams: 0}; },
+    post() { posts++; return new Promise(resolve => { finish = resolve; }); } });
+  await flow.refresh(); flow.review(100); const pending = flow.submit(); await flow.submit();
+  flow.edit(); flow.cancel(); assert.equal(posts, 1); assert.equal(flow.getSnapshot().busy, true);
+  finish(authoritativeReceipt); await pending; assert.equal(flow.getSnapshot().receipt, authoritativeReceipt);
+});
+test("API unavailable clears previously displayed balances and offers explicit recovery", async () => {
+  let offline = false;
+  const flow = createPurchaseFlow({ async get(path) { if (offline) throw new TypeError("network"); return path.endsWith("gold-price") ? priceA : { walletBalanceLkr: 1000, goldHoldingGrams: 0.12 }; }, async post() { throw new Error("must not post"); } });
+  await flow.refresh(); offline = true; await flow.refresh();
+  assert.equal(flow.getSnapshot().balances, null); assert.equal(flow.getSnapshot().price, null);
+  assert.match(flow.getSnapshot().error, /Refresh/); assert.equal(flow.getSnapshot().loading, false);
+  offline = false; await flow.refresh(); assert.equal(flow.getSnapshot().balances.walletBalanceLkr, 1000);
+});
+
+test("refresh after an uncertain purchase cannot replace the submitted quote or idempotency key", async () => {
+  const h = harness(); await h.flow.refresh(); h.flow.review(100); h.fail("transport"); await h.flow.submit();
+  h.price(priceB); await h.flow.refresh();
+  assert.equal(h.flow.getSnapshot().uncertain, true);
+  assert.equal(h.flow.getSnapshot().price.priceVersionId, "price-a");
+  h.fail(null); await h.flow.submit(); assert.deepEqual(h.calls[0], h.calls[1]);
+  assert.equal(h.flow.getSnapshot().uncertain, false);
+});
+
+test("a definite price rejection after transport uncertainty unlocks quote recovery and new-price confirmation", async () => {
+  const h = harness(); await h.flow.refresh(); h.flow.review(100); h.fail("transport"); await h.flow.submit();
+  h.price(priceB); h.fail("PRICE_CHANGED"); await h.flow.submit();
+  assert.deepEqual(h.calls[0], h.calls[1]); assert.equal(h.flow.getSnapshot().uncertain, false);
+  assert.equal(h.flow.getSnapshot().priceChange.previousPrice.priceVersionId, "price-a");
+  h.fail(null); h.flow.reviewUpdated(); await h.flow.submit();
+  assert.equal(h.calls[2].body.priceVersionId, "price-b"); assert.notEqual(h.calls[2].key, h.calls[0].key);
 });

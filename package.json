@@ -12,5 +12,11 @@
   "engines": {
     "node": ">=22.0.0"
   },
-  "packageManager": "pnpm@9.0.0"
+  "packageManager": "pnpm@9.0.0",
+  "pnpm": {
+    "overrides": {
+      "brace-expansion@<2": "1.1.21",
+      "source-map-js@<1.2.2": "1.2.2"
+    }
+  }
 }

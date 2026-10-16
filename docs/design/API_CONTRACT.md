@@ -22,7 +22,8 @@ This document specifies the versioned REST API surface (`/api/v1/...`) for Nidhi
    - State-changing requests (`POST`, `PUT`, `PATCH`, `DELETE`) from web clients include an Anti-Forgery / CSRF validation header (`X-CSRF-TOKEN`).
    - The antiforgery request token is obtained explicitly via `GET /api/v1/auth/antiforgery` (ODQ-003).
    - Neither authentication session tokens nor antiforgery tokens may ever be stored in `localStorage` or `sessionStorage` (OD-018, ODQ-003).
-7. **Pagination**:
+7. **Error envelope**: All API failures use `application/problem+json`, `type: "about:blank"`, the standard HTTP status phrase as `title`, safe occurrence-specific `detail`, `status`, path-only `instance`, and unchanged `code`, `timestampUtc`, `traceId` extensions. No production error-document origin is approved. See [API_ERRORS.md](API_ERRORS.md).
+8. **Pagination**:
    - Query parameters: `page` (default `1`), `pageSize` (default `20`, maximum `100`).
    - Response envelope contains items and pagination metadata (`page`, `pageSize`, `totalCount`, `totalPages`).
 

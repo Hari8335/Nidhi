@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
 import { Alert, Button, FormField, Input, PasswordInput } from "@/components/ui/primitives";
 import { api, ApiError } from "@/lib/api/client";
-import { roleHome } from "@/lib/auth/routing";
+import { signInDestination } from "@/lib/auth/routing";
 import { confirmationError, passwordError, passwordGuidance } from "@/lib/validation/auth";
 import { useAuth } from "./auth-provider";
 import type { LoginResponse, MessageResponse, RegistrationResponse } from "@/types/auth";
@@ -19,10 +19,10 @@ const copy: Record<Mode, { title: string; intro: string; action: string }> = {
   "forgot-password": { title: "Forgot your password?", intro: "Enter your email and we’ll help you get back in.", action: "Send reset instructions" },
   "reset-password": { title: "Choose a new password", intro: "Open the Reset password link in your email, then choose your new password.", action: "Reset password" },
 };
-export function AuthForm({ mode }: { mode: Mode }) {
-  return mode === "verify-email" ? <EmailVerificationForm /> : <StandardAuthForm mode={mode} />;
+export function AuthForm({ mode, expired = false, returnTo = null }: { mode: Mode; expired?: boolean; returnTo?: string | null }) {
+  return mode === "verify-email" ? <EmailVerificationForm /> : <StandardAuthForm mode={mode} expired={expired} returnTo={returnTo} />;
 }
-function StandardAuthForm({ mode }: { mode: Mode }) {
+function StandardAuthForm({ mode, expired, returnTo }: { mode: Mode; expired: boolean; returnTo: string | null }) {
   const router = useRouter();
   const { refresh, clear } = useAuth();
   const lock = useRef(false);
@@ -57,7 +57,7 @@ function StandardAuthForm({ mode }: { mode: Mode }) {
         const result = await api.post<LoginResponse>("/auth/login", { email: value("email").trim(), password: value("password") });
         form.reset();
         const user = await refresh();
-        const destination = user ? roleHome(user.roles) : roleHome([result.role]);
+        const destination = signInDestination(user?.roles ?? [result.role], returnTo);
         if (!destination) throw new Error("unsupported-role");
         router.replace(destination);
       } else if (mode === "register") {
@@ -90,6 +90,7 @@ function StandardAuthForm({ mode }: { mode: Mode }) {
   }
   return <>
     <div className="auth-heading"><p className="eyebrow">YOUR NIDHI ACCOUNT</p><h1>{copy[mode].title}</h1><p>{copy[mode].intro}</p></div>
+    {mode === "login" && expired && <Alert tone="info">Your session has ended. Please sign in again to continue.</Alert>}
     {success ? <div className="success-state"><span className="success-ring" aria-hidden="true">✓</span><Alert tone="success">{success}</Alert>
       {mode === "register" ? <Link className="button" href="/verify-email">Continue to verification</Link> : mode === "forgot-password" ? <Link className="button" href="/reset-password">I have a reset code</Link> : <Link className="button" href="/login">Continue to sign in</Link>}
       {(mode === "register" || mode === "forgot-password") && <p className="small muted"><Link href="/login">Back to sign in</Link></p>}
@@ -99,7 +100,7 @@ function StandardAuthForm({ mode }: { mode: Mode }) {
       {mode === "register" && <FormField id="displayName" label="Display name (optional)" error={fields.displayName}><Input id="displayName" name="displayName" autoComplete="nickname" maxLength={100} aria-invalid={!!fields.displayName} aria-describedby={described("displayName")} /></FormField>}
       {!tokenFlow && <FormField id="email" label="Email address" error={fields.email}><Input id="email" name="email" type="email" autoComplete="email" required maxLength={256} aria-invalid={!!fields.email} aria-describedby={described("email")} /></FormField>}
       {tokenFlow && !emailLink && <>
-        <FormField id="userId" label="Account ID" hint="The userId supplied with your code." error={fields.userId}><Input id="userId" name="userId" required autoComplete="off" spellCheck={false} maxLength={36} pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}" aria-invalid={!!fields.userId} aria-describedby={described("userId", "hint")} /></FormField>
+        <FormField id="userId" label="Account ID" hint="The account reference supplied with your code." error={fields.userId}><Input id="userId" name="userId" required autoComplete="off" spellCheck={false} maxLength={36} pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}" aria-invalid={!!fields.userId} aria-describedby={described("userId", "hint")} /></FormField>
         <FormField id="token" label={mode === "verify-email" ? "Verification code" : "Reset code"} hint="Codes expire after one hour and can only be used once." error={fields.token}><Input id="token" name="token" type="password" required maxLength={4096} autoComplete="off" spellCheck={false} aria-invalid={!!fields.token} aria-describedby={described("token", "hint")} /></FormField>
         {process.env.NODE_ENV === "development" && <p className="development-note">Check your email for your account ID and code. If local file delivery is configured, use the private email pickup JSON file. Never share your code.</p>}
       </>}

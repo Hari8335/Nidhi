@@ -31,13 +31,27 @@ if (args.Contains("provision-admin", StringComparer.Ordinal))
     return;
 }
 
+// Hosting-specific trusted proxies/HTTPS redirects remain deployment configuration.
+if (!app.Environment.IsDevelopment()) app.UseHsts();
 app.Use(async (context, next) =>
 {
+    context.Response.OnStarting(() =>
+    {
+        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        context.Response.Headers["Referrer-Policy"] = "no-referrer";
+        context.Response.Headers["X-Frame-Options"] = "DENY";
+        return Task.CompletedTask;
+    });
     if (context.Request.Path.StartsWithSegments("/api")) context.Response.Headers.CacheControl = "no-store";
     try { await next(context); }
     catch (AuthFailure failure)
     {
         await Results.Problem(AuthProblems.Create(context, failure.Status, failure.Code, failure.Message, failure.Errors)).ExecuteAsync(context);
+    }
+    catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+    {
+        // Navigation and deliberately lost responses can abort reads. These are not server faults.
+        if (!context.Response.HasStarted) context.Response.StatusCode = StatusCodes.Status499ClientClosedRequest;
     }
     catch (Exception exception)
     {
