@@ -8,6 +8,8 @@ import { roleHome } from "@/lib/auth/routing";
 import { confirmationError, passwordError, passwordGuidance } from "@/lib/validation/auth";
 import { useAuth } from "./auth-provider";
 import type { LoginResponse, MessageResponse, RegistrationResponse } from "@/types/auth";
+import { EmailVerificationForm } from "./email-verification-form";
+import { useEmailLink } from "./use-email-link";
 
 type Mode = "login" | "register" | "verify-email" | "forgot-password" | "reset-password";
 const copy: Record<Mode, { title: string; intro: string; action: string }> = {
@@ -15,9 +17,12 @@ const copy: Record<Mode, { title: string; intro: string; action: string }> = {
   register: { title: "Start with a small step", intro: "Create your account. Build your saving habit.", action: "Create account" },
   "verify-email": { title: "Verify your email", intro: "Use the account ID and verification code from your verification message.", action: "Verify email" },
   "forgot-password": { title: "Forgot your password?", intro: "Enter your email and we’ll help you get back in.", action: "Send reset instructions" },
-  "reset-password": { title: "Choose a new password", intro: "Use the account ID and reset code from your password reset message.", action: "Reset password" },
+  "reset-password": { title: "Choose a new password", intro: "Open the Reset password link in your email, then choose your new password.", action: "Reset password" },
 };
 export function AuthForm({ mode }: { mode: Mode }) {
+  return mode === "verify-email" ? <EmailVerificationForm /> : <StandardAuthForm mode={mode} />;
+}
+function StandardAuthForm({ mode }: { mode: Mode }) {
   const router = useRouter();
   const { refresh, clear } = useAuth();
   const lock = useRef(false);
@@ -25,6 +30,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const [error, setError] = useState("");
   const [fields, setFields] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState("");
+  const [pendingVerification, setPendingVerification] = useState(false);
+  const emailLink = useEmailLink(mode === "reset-password");
   const tokenFlow = mode === "verify-email" || mode === "reset-password";
   const newPassword = mode === "register" || mode === "reset-password";
   const hasPassword = newPassword || mode === "login";
@@ -55,7 +62,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
         router.replace(destination);
       } else if (mode === "register") {
         await api.post<RegistrationResponse>("/auth/register", { email: value("email").trim(), password: value("password"), displayName: value("displayName").trim() || null });
-        form.reset(); setSuccess("Your account is ready. Check your verification message before using future simulated financial features.");
+        form.reset(); setSuccess("Check your inbox and select Verify email to finish creating your account. Your email is still awaiting verification.");
       } else if (mode === "forgot-password") {
         await api.post<MessageResponse>("/auth/forgot-password", { email: value("email").trim() });
         form.reset(); setSuccess("If an account exists for this email, password reset instructions have been sent.");
@@ -63,7 +70,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
         await api.post<MessageResponse>("/auth/verify-email", { userId: value("userId").trim(), token: value("token").trim() });
         form.reset(); await refresh(); setSuccess("Email verified. You’re ready to sign in.");
       } else {
-        await api.post<MessageResponse>("/auth/reset-password", { userId: value("userId").trim(), token: value("token").trim(), newPassword: value("password") });
+        await api.post<MessageResponse>("/auth/reset-password", { userId: emailLink?.userId ?? value("userId").trim(), token: emailLink?.token ?? value("token").trim(), newPassword: value("password") });
         form.reset(); clear(); setSuccess("Your password has been reset. Sign in with your new password.");
       }
     } catch (failure) {
@@ -78,6 +85,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
         setFields(mapped);
       }
       if (failure instanceof ApiError && failure.problem.code === "EMAIL_ALREADY_EXISTS") setFields({ email: "This email is already registered." });
+      if (failure instanceof ApiError && failure.problem.code === "EMAIL_VERIFICATION_REQUIRED") setPendingVerification(true);
     } finally { lock.current = false; setBusy(false); }
   }
   return <>
@@ -87,12 +95,13 @@ export function AuthForm({ mode }: { mode: Mode }) {
       {(mode === "register" || mode === "forgot-password") && <p className="small muted"><Link href="/login">Back to sign in</Link></p>}
     </div> : <form onSubmit={submit} className="auth-form" aria-busy={busy}>
       {error && <Alert>{error}</Alert>}
+      {pendingVerification && <Link href="/verify-email" className="button">Continue verification / resend email</Link>}
       {mode === "register" && <FormField id="displayName" label="Display name (optional)" error={fields.displayName}><Input id="displayName" name="displayName" autoComplete="nickname" maxLength={100} aria-invalid={!!fields.displayName} aria-describedby={described("displayName")} /></FormField>}
       {!tokenFlow && <FormField id="email" label="Email address" error={fields.email}><Input id="email" name="email" type="email" autoComplete="email" required maxLength={256} aria-invalid={!!fields.email} aria-describedby={described("email")} /></FormField>}
-      {tokenFlow && <>
+      {tokenFlow && !emailLink && <>
         <FormField id="userId" label="Account ID" hint="The userId supplied with your code." error={fields.userId}><Input id="userId" name="userId" required autoComplete="off" spellCheck={false} maxLength={36} pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}" aria-invalid={!!fields.userId} aria-describedby={described("userId", "hint")} /></FormField>
         <FormField id="token" label={mode === "verify-email" ? "Verification code" : "Reset code"} hint="Codes expire after one hour and can only be used once." error={fields.token}><Input id="token" name="token" type="password" required maxLength={4096} autoComplete="off" spellCheck={false} aria-invalid={!!fields.token} aria-describedby={described("token", "hint")} /></FormField>
-        {process.env.NODE_ENV === "development" && <p className="development-note">Local development: copy userId and token from the private email pickup JSON file. Never share that file or your code.</p>}
+        {process.env.NODE_ENV === "development" && <p className="development-note">Check your email for your account ID and code. If local file delivery is configured, use the private email pickup JSON file. Never share your code.</p>}
       </>}
       {hasPassword && <FormField id="password" label={mode === "reset-password" ? "New password" : "Password"} hint={newPassword ? passwordGuidance : undefined} error={fields.password}><PasswordInput id="password" name="password" required minLength={newPassword ? 12 : undefined} maxLength={128} autoComplete={newPassword ? "new-password" : "current-password"} aria-invalid={!!fields.password} aria-describedby={described("password", newPassword ? "hint" : undefined)} /></FormField>}
       {mode === "reset-password" && <FormField id="confirmPassword" label="Confirm new password" error={fields.confirmPassword}><PasswordInput id="confirmPassword" name="confirmPassword" required maxLength={128} autoComplete="new-password" aria-invalid={!!fields.confirmPassword} aria-describedby={described("confirmPassword")} /></FormField>}

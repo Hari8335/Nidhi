@@ -25,11 +25,28 @@ dotnet run --project src/Nidhi.Api
 
 In Development only, the sender creates one randomly named JSON file for each verification/reset message, containing `purpose`, `userId`, `email`, and `token`. On Unix the directory is owner-only (0700) and files are created owner-only (0600). On Windows, configure an owner-only ACL on the pickup directory before use. Treat these files as credentials: inspect locally, do not paste into issues/logs or serve them over HTTP, and delete after testing. No tokens are printed by the API. `.identity-emails/` is also ignored as a guard against accidental local pickup under the repository.
 
-Registration writes the verification message before committing the transaction. If delivery fails, the user/profile/wallet/holding/role-membership changes roll back; the same registration can be retried. A file written just before a failed database commit is unusable because its user was not committed. This foundation does not provide an email outbox or a resend endpoint.
+Registration writes the verification message before committing the transaction. If delivery fails, the user/profile/wallet/holding/role-membership changes roll back; the same registration can be retried. A file written just before a failed database commit is unusable because its user was not committed. This implementation does not provide an email outbox. Pending accounts can request another message through `POST /api/v1/auth/resend-verification`.
 
 Forgot-password always returns the same generic 200 message for known/unknown accounts and delivery failure. Failures produce a safe warning without address/token/exception data; retry the request after delivery is restored. Response equivalence is not a constant-time delivery guarantee.
 
-The default sender refuses to write pickup files outside Development. Production registration therefore returns `503 IDENTITY_EMAIL_UNAVAILABLE`; recovery remains generic and logs a safe delivery warning. A real implementation of the minimal `IIdentityEmailSender` must be registered before enabling public production signup/recovery. No paid provider or notification platform is integrated.
+The default `IdentityEmail:Provider=Pickup` sender refuses to write pickup files outside Development. With that provider, production registration returns `503 IDENTITY_EMAIL_UNAVAILABLE`; recovery remains generic and logs a safe delivery warning. Gmail delivery is available through the configuration below. No paid provider or notification platform is integrated.
+
+## Gmail delivery
+
+Set `IdentityEmail:Provider=Gmail` to send verification and password reset messages through Gmail instead of pickup files. Messages contain a styled Verify email or Reset password button and a plain-text fallback link. `IdentityEmail:PublicBaseUrl` must be an explicitly configured trusted frontend origin (HTTPS, or localhost HTTP). Tokens are URL-encoded in the link fragment, which is not sent to the web server; the browser removes it from the address bar and retains it only in memory. Opening a link does not mutate an account; the user confirms verification or submits a new password through the existing CSRF-protected POST endpoint. The sender connects to `smtp.gmail.com:587` with required STARTTLS and normal certificate validation, authenticates as the sender address, and uses a 15-second cancellation deadline. Delivery failures return the existing sanitized `503 IDENTITY_EMAIL_UNAVAILABLE`; registration rolls back as before. An SMTP server accepting a message does not guarantee inbox delivery. If the database commit fails after acceptance, the message cannot verify an uncommitted account.
+
+For local development:
+
+1. Enable 2-Step Verification for the Google account that will send messages, then create an app password named `Nidhi` at <https://myaccount.google.com/apppasswords>. See [Google's app password instructions](https://support.google.com/accounts/answer/185833). Some account policies do not permit app passwords.
+2. From the repository root, run `python3 scripts/configure-gmail.py`. Enter the sender address and the app password at the prompts. The password input is hidden. Do not use your normal Google password or paste credentials into chat.
+3. Restart the Development API with its existing `ConnectionStrings__NidhiDb` configuration. The setup script saves email settings to ASP.NET Core user-secrets, outside the repository; ASP.NET Core loads those settings in Development. User-secrets are local development storage, not an encrypted production secret manager.
+4. Register a new test account and check its inbox/spam folder. Select Verify email in the message, then confirm on the verification page. Pending accounts can request a fresh link from `/verify-email`; repeated signup reports `EMAIL_VERIFICATION_REQUIRED` and offers that page rather than suggesting signup completed. The initial password is unchanged. Password recovery sends a reset link through the same Gmail sender and does not confirm email.
+
+For deployments, supply `IdentityEmail__Provider=Gmail`, `IdentityEmail__Gmail__Address`, `IdentityEmail__Gmail__AppPassword`, and `IdentityEmail__PublicBaseUrl` through protected environment/secret configuration. Do not put the app password in tracked files. To return to private local pickup, set `IdentityEmail:Provider` to `Pickup` and configure its absolute pickup directory.
+
+The SMTP implementation uses MailKit 4.17.0 for authenticated TLS delivery. `System.Security.Cryptography.Pkcs` is pinned to 10.0.13 to override the vulnerable transitive version brought by MimeKit.
+
+Certificate revocation checks are enabled by default. If local certificate validation fails specifically because revocation status cannot be obtained, first restore access to the certificate authority's revocation service. An explicit local exception is available with `IdentityEmail:Gmail:CheckCertificateRevocation=false`, after accepting that a revoked certificate may go undetected. This setting is rejected outside Development. TLS encryption and standard hostname, validity, and trust-chain checks remain enabled. Never install an accept-all certificate callback.
 
 ## CSRF and API flow
 
@@ -86,6 +103,7 @@ Built-in in-process fixed-window rate limits are partitioned by the connection's
 | register | 5 |
 | login | 10 |
 | forgot-password | 5 |
+| resend-verification | 5 |
 | tokens (verify-email/reset-password combined) | 20 |
 
 `GET /api/v1/auth/antiforgery` has no application rate-limit policy and no global limiter is configured. Token refreshes after login/logout/reset or session expiration do not consume the `tokens` allowance; that shared 20/minute allowance applies only to verification/reset POSTs. Normal auth flows can refresh CSRF tokens without application throttling. `me` and logout also have no endpoint rate-limit policy.
@@ -105,3 +123,9 @@ dotnet test Nidhi.sln
 The authentication suite creates only a random `nidhi_auth_test_*` database, applies the real migration, hosts the actual API with a capturing test email sender, tests cookie/CSRF flows and authorization using test-only probe controllers, and drops its own database at teardown. The existing persistence suite also validates PostgreSQL 18. Without `NIDHI_TEST_POSTGRES`, database-dependent tests explicitly skip; that is not PostgreSQL validation. Local pickup behavior is also tested separately without emailing anyone.
 
 Session 5 resolves two contract omissions: `/auth/me` supplies the requested safe current-user endpoint; CSRF/rate-limit/email-delivery/internal-failure error codes are added to the standard envelope. Verification and reset retain the approved `INVALID_TOKEN` code. No repository-local standalone SRS currently exists; no `.docx` or duplicate requirements document is introduced. Existing requirements/design documents remain authoritative for now; `PROJECT_SPEC.md` and the current requirements/design documents supply the repository requirements, consistent with the existing historical missing-source note.
+
+## Pending accounts and resend
+
+Registration stores an unverified Identity account and zero balances atomically. A pending account is not email-confirmed and cannot use simulated financial APIs. Its email remains unique; another signup cannot silently overwrite its password or profile. `EMAIL_VERIFICATION_REQUIRED` lets the frontend guide the user back to verification.
+
+Anonymous `POST /api/v1/auth/resend-verification` accepts only `{ "email": "..." }`, requires antiforgery, and is limited to five requests per IP per minute. It returns the same generic 200 message for pending, verified, unknown, and delivery-failure cases; only pending accounts receive mail. The UI adds a 60-second resend cooldown; server rate limiting remains authoritative. Resend creates a fresh one-hour Identity token without changing credentials, sessions, or financial records. Earlier unexpired links remain usable until verification succeeds, after which all verification links are rejected. No claim of constant-time responses or distributed throttling is made.

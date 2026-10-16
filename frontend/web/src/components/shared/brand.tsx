@@ -15,7 +15,7 @@ export function Brand({ className = "" }: { className?: string }) {
         alt="Nidhi"
         width={2172}
         height={724}
-        priority
+        sizes="(max-width: 639px) 136px, 180px"
         className="brand-image"
       />
     </Link>

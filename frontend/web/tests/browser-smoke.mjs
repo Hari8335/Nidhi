@@ -49,13 +49,13 @@ try {
  await page.setViewportSize({width:1440,height:1000});
  stage='registration';await goto('/register');
  await fill('Display name (optional)','Session Six');await fill('Email address',email);await fill('Password',password);await click('Create account');
- await waitText('Your account is ready.');
+ await waitText('Check your inbox and select Verify email');
  assert.ok(seen.some(r=>r.path.endsWith('/antiforgery')&&r.status===200));
  assert.ok(seen.some(r=>r.path.endsWith('/register')&&r.status===201));
  console.log('PASS: browser registration and automatic antiforgery');
  stage='verification';const verify=await pickup('verification');
  await page.getByRole('link',{name:'Continue to verification'}).click();
- await fill('Account ID',verify.userId);await fill('Verification code',verify.token);await click('Verify email');await waitText('Email verified.');
+ await goto('/verify-email#userId='+encodeURIComponent(verify.userId)+'&token='+encodeURIComponent(verify.token));await click('Verify email');await waitText('Email verified');
  console.log('PASS: private development pickup and browser verification');
  stage='customer login';await goto('/login');await fill('Email address',email);await fill('Password',password);await click('Sign in');await page.waitForURL('**/dashboard');await waitText('Welcome, Session Six');
  assert.ok(seen.some(r=>r.path.endsWith('/me')&&r.status===200));
@@ -84,7 +84,7 @@ try {
  assert.deepEqual(await page.evaluate(()=>({local:localStorage.length,session:sessionStorage.length})),{local:0,session:0});assert.equal(errors.length,0);
  console.log('PASS: inline validation, keyboard focus, reduced motion, empty browser storage, no uncaught JS errors');
  stage='invalid token and duplicate email';
- await goto('/verify-email');await fill('Account ID','00000000-0000-0000-0000-000000000001');await fill('Verification code','invalid-test-code');await click('Verify email');await waitText('invalid, expired, or already used');
+ await goto('/verify-email#userId=00000000-0000-0000-0000-000000000001&token=invalid-test-code');await click('Verify email');await waitText('invalid, expired, or already used');
  await goto('/register');await fill('Email address',email);await fill('Password',nextPassword);await click('Create account');await waitText('This email is already registered.');
  stage='network, rate-limit and loading UX';
  // Supplemental UI fault injection; the end-to-end flow above uses the real API.

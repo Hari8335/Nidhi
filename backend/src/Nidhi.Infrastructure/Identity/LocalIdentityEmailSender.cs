@@ -26,7 +26,9 @@ public sealed class LocalIdentityEmailSender(IHostEnvironment environment, IConf
             var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write };
             if (!OperatingSystem.IsWindows()) options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
             await using var stream = new FileStream(path, options);
-            await JsonSerializer.SerializeAsync(stream, new { purpose, userId, email, token });
+            var link = string.IsNullOrWhiteSpace(configuration["IdentityEmail:PublicBaseUrl"]) ? null
+                : IdentityEmailLink.Create(configuration, userId, token, purpose == "password-reset");
+            await JsonSerializer.SerializeAsync(stream, new { purpose, userId, email, token, link });
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {

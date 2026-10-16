@@ -1,5 +1,3 @@
-"use client";
-
 import { useId } from "react";
 
 /**
@@ -8,7 +6,7 @@ import { useId } from "react";
  * - Partial circular gold arc derived from the Nidhi coin mark
  * - Ascending fractional savings bars representing micro-saving steps
  * - Floating simulated holding card with explicit decorative values
- * - Accumulating gold fragment particles
+ * - Static gold accents
  * - Restrained metallic depth and lighting
  * Respects prefers-reduced-motion.
  */
@@ -151,7 +149,7 @@ export function GoldSavingsVisual() {
           />
         </g>
 
-        {/* Small floating gold fragment particles */}
+        {/* Static gold accents */}
         <circle className="gold-particle particle-1" cx="370" cy="95" r="3.5" fill="#F0D77B" />
         <circle className="gold-particle particle-2" cx="445" cy="180" r="2.5" fill="#C9A227" />
         <circle className="gold-particle particle-3" cx="115" cy="220" r="3" fill="#F3DE8A" />
@@ -165,7 +163,7 @@ export function GoldSavingsVisual() {
           <div className="card-top-row">
             <span className="holding-pill">
               <span className="holding-dot" />
-              DEMO / SIMULATED HOLDING
+              DEMO
             </span>
             <span className="holding-karat">SIMULATION PREVIEW</span>
           </div>
@@ -198,8 +196,8 @@ export function GoldSavingsVisual() {
       {/* Secondary micro milestone pill */}
       <div className="milestone-pill-wrapper">
         <div className="milestone-pill">
-          <span className="milestone-icon">✓</span>
-          <span className="milestone-text">Goal tracking: 1.4825 g of 5.0000 g</span>
+          <span className="milestone-icon">→</span>
+          <span className="milestone-text">Demo goal: 1.4825 g of 5.0000 g</span>
         </div>
       </div>
     </div>
@@ -207,7 +205,7 @@ export function GoldSavingsVisual() {
 }
 
 /**
- * Compact animated Nidhi mark for Auth pages and compact headers.
+ * Compact Nidhi savings illustration for Auth pages and compact headers.
  */
 export function AuthSavingsMark() {
   return (

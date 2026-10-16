@@ -34,6 +34,13 @@ public sealed class AuthController(IAuthService auth, IAntiforgery antiforgery) 
         return new MessageResponse("Email successfully verified. You are now eligible to use simulated financial features.");
     }
 
+    [HttpPost("resend-verification"), EnableRateLimiting("resend-verification")]
+    public async Task<MessageResponse> ResendVerification(ResendVerificationRequest request)
+    {
+        await auth.ResendVerificationAsync(request);
+        return new MessageResponse("If this email is awaiting verification, a new verification email has been sent. Check your inbox and spam folder.");
+    }
+
     [HttpPost("login"), EnableRateLimiting("login")]
     [ProducesResponseType<LoginResponse>(200)]
     public async Task<ActionResult<LoginResponse>> Login(LoginRequest request)
