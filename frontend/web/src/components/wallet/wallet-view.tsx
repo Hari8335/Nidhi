@@ -16,8 +16,8 @@ export function WalletView() {
   const [error, setError] = useState<string | null>(null);
   const [fundingModalOpen, setFundingModalOpen] = useState(false);
 
-  const fetchWallet = useCallback(async () => {
-    setLoading(true);
+  const fetchWallet = useCallback(async (background = false) => {
+    if (!background) setLoading(true);
     setError(null);
     try {
       const res = await api.get<WalletSummary>("/customer/wallet");
@@ -44,7 +44,7 @@ export function WalletView() {
   const user = session.user;
 
   function handleFundingSuccess() {
-    void fetchWallet();
+    void fetchWallet(true);
   }
 
   const balance = wallet ? wallet.balanceLkr : 0;
@@ -96,6 +96,7 @@ export function WalletView() {
               </div>
               <Button
                 className="button-primary"
+                data-funding-trigger
                 onClick={() => setFundingModalOpen(true)}
               >
                 + Add Simulated Funds
@@ -136,21 +137,20 @@ export function WalletView() {
           <div className="wallet-cards-grid">
             <Card className="simulation-disclosure-card">
               <p className="eyebrow">SIMULATION DISCLOSURE</p>
-              <h3>Purely Educational & Simulated</h3>
+              <h2>Purely Educational & Simulated</h2>
               <p>
                 Nidhi is currently in a prototype / simulation phase. Adding simulated funds does
                 <strong> not charge any bank card or fiat account</strong>, and balances cannot be
-                withdrawn for real money. Every operation creates an auditable double-entry ledger record
-                mirroring real financial engineering principles.
+                withdrawn for real money. Each completed operation has a receipt in your transaction history.
               </p>
               <div className="mt-4">
-                <StatusBadge>Double-Entry Ledger Verified</StatusBadge>
+                <StatusBadge>Simulation only</StatusBadge>
               </div>
             </Card>
 
             <Card className="limits-card">
-              <p className="eyebrow">APPROVED POLICIES</p>
-              <h3>Operational Limits</h3>
+              <p className="eyebrow">FUNDING LIMITS</p>
+              <h2>Funding limits</h2>
               <dl className="limits-list">
                 <div>
                   <dt>Minimum per operation</dt>

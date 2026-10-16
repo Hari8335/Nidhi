@@ -34,7 +34,7 @@ test('all POSTs obtain and reuse memory-only CSRF and include cookies', async ()
     calls.push({ url, init });
     return url.endsWith('antiforgery') ? json({ token: 'test-csrf' }) : json({ message: 'ok' });
   });
-  await client.post('/auth/register', { email: 'example@example.test' });
+  await client.post('/auth/forgot-password', { email: 'example@example.test' });
   await client.post('/auth/forgot-password', {});
   assert.equal(calls.filter(c => c.url.endsWith('antiforgery')).length, 1);
   for (const c of calls) { assert.equal(c.init.credentials, 'include'); assert.equal(c.init.cache, 'no-store'); }
@@ -46,7 +46,7 @@ test('concurrent requests share an antiforgery fetch', async () => {
   await Promise.all([client.post('/a'), client.post('/b')]);
   assert.equal(tokens, 1);
 });
-for (const transition of ['login', 'logout', 'reset-password']) {
+for (const transition of ['login', 'logout', 'register', 'reset-password']) {
   test(`successful ${transition} invalidates the CSRF token before the next POST`, async () => {
     let tokens = 0;
     const client = createApiClient('', async url => {
@@ -136,4 +136,9 @@ test('current-session 401 announces expiry but invalid login does not', async ()
     await assert.rejects(client.get('/invalid-login'), ApiError);
     assert.deepEqual(events, ['nidhi:session-expired']);
   } finally { if (original === undefined) delete globalThis.window; else globalThis.window = original; }
+});
+
+test('Problem Details preserves non-hostname type and safe correlation fields', () => {
+  assert.deepEqual(parseProblem({ type: 'about:blank', instance: '/api/v1/customer/gold-purchases', timestampUtc: '2026-10-16T00:00:00Z', code: 'PRICE_CHANGED', status: 409 }), { type: 'about:blank', instance: '/api/v1/customer/gold-purchases', timestampUtc: '2026-10-16T00:00:00Z', code: 'PRICE_CHANGED', status: 409 });
+  assert.deepEqual(parseProblem({ type: 42, instance: [], timestampUtc: false }), {});
 });

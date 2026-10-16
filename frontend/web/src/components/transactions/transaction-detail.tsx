@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { formatDateTime } from "@/lib/format/date";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api/client";
 import { receiptFields } from "@/lib/transactions/presentation";
@@ -18,6 +19,6 @@ export function TransactionDetail({ id }: { id: string }) {
   }, [id, retry]);
   return <div className="dashboard-root"><Link href="/transactions" className="button button-secondary">← All transactions</Link>
     <div className="page-heading"><p className="eyebrow">YOUR RECORD</p><h1>Transaction receipt</h1><p>A completed simulated operation. All values below are from its original receipt.</p></div>
-    {error ? <div className="card"><Alert>{error}</Alert><Button onClick={() => { setError(""); setRetry(x => x + 1); }}>Retry receipt</Button></div> : receipt ? <section className="card"><h2>Completed</h2><dl className="receipt-fields">{receiptFields(receipt).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{label === "Completed at (UTC)" ? <time dateTime={value}>{value}</time> : value}</dd></div>)}</dl>{receipt.type === "GOLD_PURCHASE" && <p>The conversion residual is a rounding delta, not a fee or refund.</p>}</section> : <LoadingState text="Loading original receipt…" />}
+    {error ? <div className="card"><Alert>{error}</Alert><Button onClick={() => { setError(""); setRetry(x => x + 1); }}>Retry receipt</Button></div> : receipt ? <section className="card"><h2>Completed</h2><dl className="receipt-fields">{receiptFields(receipt).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{label === "Completed at (UTC)" ? <time dateTime={value} title={value}>{formatDateTime(value)}</time> : value}</dd></div>)}</dl>{receipt.type === "GOLD_PURCHASE" && <p>The conversion residual is a rounding delta, not a fee or refund.</p>}</section> : <LoadingState text="Loading original receipt…" />}
   </div>;
 }

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Nidhi.Api.Authentication;
@@ -10,7 +11,7 @@ public static class AuthProblems
     {
         var problem = new ProblemDetails
         {
-            Type = $"https://api.nidhi.lk/errors/{code}", Title = detail, Detail = detail,
+            Type = "about:blank", Title = ReasonPhrases.GetReasonPhrase(status), Detail = detail,
             Status = status, Instance = context.Request.Path
         };
         problem.Extensions["code"] = code;

@@ -29,6 +29,7 @@
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
+  --space-5: 20px;
   --space-6: 24px;
   --space-8: 32px;
   --space-12: 48px;
@@ -2783,3 +2784,34 @@ nav small {
 .landing-page .section-header { display: grid; gap: 12px; justify-content: stretch; }
 .landing-page .section-header h2 { font-size: clamp(24px, 2.5vw, 32px); }
 @media (max-width: 639px) { .landing-page .simulation-box, .landing-page .goal-story { padding: 24px; } }
+
+/* Financial controls share the same visible, keyboard-friendly affordance. */
+.input, .admin-filters input, .admin-filters select, .admin-price-form input, .admin-price-form textarea {
+  border-color: #697586;
+  min-height: 48px;
+  font-size: 16px;
+}
+.input:hover:not(:disabled), .admin-filters input:hover, .admin-filters select:hover,
+.admin-price-form input:hover:not(:disabled), .admin-price-form textarea:hover:not(:disabled) { border-color: var(--muted-foreground); }
+.input:disabled, .admin-price-form :disabled { background: var(--surface-elevated); color: var(--muted-foreground); cursor: not-allowed; }
+.input::placeholder { color: var(--muted-foreground); }
+.admin-price-form [aria-invalid="true"] { border-color: var(--danger); }
+.gold-purchase-card, .price-change { display: grid; gap: 1rem; }
+.gold-purchase-card form { display: grid; gap: 1rem; }
+.gold-confirmation { display: flex; flex-wrap: wrap; gap: .75rem; }
+.gold-confirmation h3, .gold-confirmation p { flex-basis: 100%; }
+.price-change { border-color: var(--warning); }
+.modal-backdrop { width: 100%; height: 100%; max-width: none; max-height: none; border: 0; margin: 0; color: var(--foreground); overflow-y: auto; }
+.modal-backdrop:not([open]) { display: none; }
+.modal-backdrop::backdrop { background: rgba(0, 0, 0, .65); }
+.modal-container { max-height: 100%; overflow-y: auto; border-radius: var(--radius-feature); }
+.application-content { min-width: 0; }
+.application-content:focus { outline: none; }
+.account-summary .button { min-height: 44px; }
+/* Keep native dialog contents visible without depending on an entrance animation
+   or a filtered top layer (which failed to paint in Safari during live review). */
+.modal-backdrop { background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; animation: none; }
+.modal-backdrop::backdrop { background: rgba(0, 0, 0, .75); }
+.modal-backdrop .modal-container { animation: none; }
+.auth-card { animation: none; }
+.wallet-cards-grid h2 { font-size: 20px; }

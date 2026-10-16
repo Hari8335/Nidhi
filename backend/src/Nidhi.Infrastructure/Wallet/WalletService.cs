@@ -306,7 +306,7 @@ public sealed class WalletService(NidhiDbContext db) : IWalletService
         return (await Get($"2001-LKR-CUST-{customerId}", "Customer Simulated Wallet", LedgerUnit.LKR, AccountClassification.LIABILITY), await Get(SysClearingAccountNumber, "Gold Conversion Clearing Account", LedgerUnit.LKR, AccountClassification.CLEARING), await Get(SysGoldIssuanceAccountNumber, "System Gold Issuance Source", LedgerUnit.GOLD_GRAMS, AccountClassification.ASSET), await Get($"2501-GOLD-CUST-{customerId}", "Customer Simulated Gold Holding", LedgerUnit.GOLD_GRAMS, AccountClassification.ASSET));
     }
 
-    private static decimal ValidateGoldAmount(decimal amount) { if (amount * 100m != decimal.Truncate(amount * 100m) || amount < 100m || amount > 1000000m) throw new WalletFailure("VALIDATION_ERROR", 400, "Purchase amount must be between LKR 100.00 and LKR 1,000,000.00 with at most 2 decimal places."); return decimal.Round(amount, 2); }
+    private static decimal ValidateGoldAmount(decimal amount) { if (amount < 100m || amount > 1000000m || amount * 100m != decimal.Truncate(amount * 100m)) throw new WalletFailure("VALIDATION_ERROR", 400, "Purchase amount must be between LKR 100.00 and LKR 1,000,000.00 with at most 2 decimal places."); return decimal.Round(amount, 2); }
     private static string ComputeGoldRequestHash(decimal amount, Guid price) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"GOLD_PURCHASE|amountLkr={amount:F2}|priceVersionId={price:D}"))).ToLowerInvariant();
     private static GoldPurchaseReceiptResponse ToGoldReceipt(FinancialTransaction t) => new(t.TransactionId, t.Type.ToString(), t.Status.ToString(), t.AmountLkr, t.PriceVersionId!.Value, t.AppliedPricePerGramLkr!.Value, t.GoldQuantityGrams!.Value, t.AmountLkr - (t.GoldQuantityGrams.Value * t.AppliedPricePerGramLkr.Value), t.PostOperationWalletBalanceLkr, t.PostOperationGoldHoldingGrams!.Value, t.CreatedAtUtc);
 
@@ -323,7 +323,7 @@ public sealed class WalletService(NidhiDbContext db) : IWalletService
     private static decimal ValidateAndNormalizeFundingAmount(decimal amount)
     {
         // Reject any non-zero digits past 2 decimal places (e.g. 100.001, 100.009).
-        if (amount * 100m != decimal.Truncate(amount * 100m))
+        if (amount >= MinFunding && amount <= MaxFunding && amount * 100m != decimal.Truncate(amount * 100m))
             throw new WalletFailure("VALIDATION_ERROR", 400,
                 "The funding amount cannot have more than 2 decimal places.");
 

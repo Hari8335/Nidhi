@@ -1,5 +1,5 @@
 export type ProblemDetails = {
-  title?: string; status?: number; detail?: string; code?: string;
+  type?: string; instance?: string; timestampUtc?: string; title?: string; status?: number; detail?: string; code?: string;
   errors?: Record<string, string[]>; traceId?: string;
 };
 const messages: Record<string, string> = {
@@ -17,7 +17,7 @@ const messages: Record<string, string> = {
   INVALID_FUNDING_AMOUNT: "Funding amount must be between LKR 100.00 and LKR 1,000,000.00.",
   DAILY_FUNDING_LIMIT_EXCEEDED: "You have reached your daily funding limit of 20 operations today.",
   WALLET_LIMIT_EXCEEDED: "This funding would cause your wallet balance to exceed the maximum cap of LKR 5,000,000.00.",
-  IDEMPOTENCY_CONFLICT: "This idempotency key was previously submitted with different details.",
+  IDEMPOTENCY_CONFLICT: "This request was already used with different details. Review your transaction history before starting another.",
   OPERATION_IN_PROGRESS: "A funding request is already in progress. Please retry in a few moments.",
   PRICE_UNAVAILABLE: "The simulated gold price is temporarily unavailable. Please try again later.",
   PRICE_STALE: "The simulated gold price is temporarily stale. Please refresh and try again later.",
@@ -30,7 +30,7 @@ export function parseProblem(value: unknown): ProblemDetails {
   if (!value || typeof value !== "object") return {};
   const source = value as Record<string, unknown>;
   const result: ProblemDetails = {};
-  for (const key of ["title", "detail", "code", "traceId"] as const) {
+  for (const key of ["type", "instance", "timestampUtc", "title", "detail", "code", "traceId"] as const) {
     if (typeof source[key] === "string") result[key] = source[key];
   }
   if (typeof source.status === "number") result.status = source.status;
@@ -93,7 +93,7 @@ export function createApiClient(base = apiBase, fetcher: typeof fetch = (...args
           },
           body: body === undefined ? undefined : JSON.stringify(body),
         }, decode);
-        if (["/auth/login", "/auth/logout", "/auth/reset-password"].includes(path)) clearCsrf();
+        if (["/auth/login", "/auth/logout", "/auth/register", "/auth/reset-password"].includes(path)) clearCsrf();
         return result;
       } catch (error) {
         // Only the explicit middleware rejection is replayable: it occurs before mutation.

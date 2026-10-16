@@ -19,8 +19,8 @@ export function CustomerDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [fundingModalOpen, setFundingModalOpen] = useState(false);
 
-  const fetchDashboard = useCallback(async () => {
-    setLoading(true);
+  const fetchDashboard = useCallback(async (background = false) => {
+    if (!background) setLoading(true);
     setError(null);
     try {
       const res = await api.get<DashboardData>("/customer/dashboard", parseGoalJson<DashboardData>);
@@ -48,7 +48,7 @@ export function CustomerDashboard() {
 
   function handleFundingSuccess() {
     // Re-fetch dashboard data to sync balance and transaction history
-    void fetchDashboard();
+    void fetchDashboard(true);
   }
 
   return (
@@ -119,6 +119,7 @@ export function CustomerDashboard() {
             <div className="dashboard-cta-row">
               <Button
                 className="button-primary"
+                data-funding-trigger
                 onClick={() => setFundingModalOpen(true)}
               >
                 + Add Simulated Funds

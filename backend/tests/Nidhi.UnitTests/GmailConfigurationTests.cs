@@ -33,6 +33,20 @@ public sealed class GmailConfigurationTests
         Assert.Null(smtp.ServerCertificateValidationCallback);
     }
 
+    [Theory]
+    [InlineData("Production")]
+    [InlineData("Staging")]
+    public void Nondevelopment_defaults_to_revocation_and_normal_certificate_validation(string environment)
+    {
+        var builder = Builder(environment, null);
+        builder.AddNidhiAuthentication();
+        using var services = builder.Services.BuildServiceProvider();
+        using var scope = services.CreateScope();
+        var smtp = scope.ServiceProvider.GetRequiredService<ISmtpClient>();
+        Assert.True(smtp.CheckCertificateRevocation);
+        Assert.Null(smtp.ServerCertificateValidationCallback);
+    }
+
     private static WebApplicationBuilder Builder(string environment, string? configured)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = environment });

@@ -26,19 +26,21 @@ export function GoalsPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
+  const createLock = useRef(false);
   async function create(event: FormEvent) {
     event.preventDefault();
+    if (createLock.current) return;
     const invalid = validateTarget(target);
     setFields(invalid ? { targetGrams: invalid } : {});
-    if (invalid) return;
-    setPending(true); setError("");
+    if (invalid) { document.getElementById("targetGrams")?.focus(); return; }
+    createLock.current = true; setPending(true); setError("");
     try {
       setGoal(await api.post<SavingsGoal>("/customer/savings-goal", goalRequest(target, date), undefined, parseGoalJson<SavingsGoal>));
       setStatus("Savings goal created."); heading.current?.focus();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Your goal could not be created. Please reload before retrying.");
       if (e instanceof ApiError && e.problem.errors) setFields(Object.fromEntries(Object.entries(e.problem.errors).map(([key, value]) => [key.charAt(0).toLowerCase() + key.slice(1), value.join(" ")])));
-    } finally { setPending(false); }
+    } finally { createLock.current = false; setPending(false); }
   }
   return <div className="dashboard-root"><div className="page-heading"><p className="eyebrow">PLAN YOUR SAVINGS</p><h1 tabIndex={-1} ref={heading}>Savings Goals</h1><p>A gold target for your simulated saving journey.</p></div>
     <p role="status" className="field-hint">{status}</p>

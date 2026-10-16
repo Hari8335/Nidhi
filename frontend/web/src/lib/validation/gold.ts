@@ -11,3 +11,7 @@ export function validatePurchaseAmount(value: string, walletBalance: number) {
   return { isValid: true as const };
 }
 export function formatGoldGrams(value: number) { return value.toFixed(8); }
+
+export function formatGoldPrice(value: number) {
+  return `LKR ${value.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`;
+}
